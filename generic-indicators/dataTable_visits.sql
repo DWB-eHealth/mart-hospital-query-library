@@ -1,10 +1,10 @@
 /*ABOUT
  * The visits data table is for counting the number of consultations/admissions/exits to or from a particular department (Emergency, OPD, IPD etc.). Each row of the query represents a visit.
  
- * Variables: patient id, visit type, visit start date, visit end date, length of stay (days), age at visit start, sex, and address fields
+ * Variables: patient id, visit type, visit start date, visit end date, length of stay (days), age at visit start, sex, address fields
  * Possible Indicators: count of visits by type, average length of stay
  * Possible disaggregation: age groups, sex, address fields
- * Customization to use the data table: address field names*/
+ * Customization: address field names*/
  
 SELECT
     pvdd.patient_id AS "patient id",
