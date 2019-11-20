@@ -32,3 +32,13 @@ Below is an index of the indicators that are possible with each data table query
 <li>count of active patients per day by service</li>
 <li>average number of active patients during reporting period by service</li>
 </ul>
+
+<h4>dataTable_BOR.sql/dataTable_BOR_static.sql</h4>
+<ul>
+<li>bed occupancy rate per reporting period for all inpatient services</li>
+</ul>
+
+<h4>dataTable_BOR_byLocation.sql/dataTable_BOR_byLocation_static.sql</h4>
+<ul>
+<li>bed occupancy rate per location and reporting period </li>
+</ul>
