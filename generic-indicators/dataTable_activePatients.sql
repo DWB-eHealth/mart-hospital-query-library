@@ -1,10 +1,11 @@
 /*ABOUT
-* The active patients data table calculates the number of patients active within the facility during the reporting period. Each row represents a day and patient counts at the end of each day.
+ * The active patients data table calculates the number of patients active within the facility during the reporting period. 
+ * Each row represents a day and patient counts at the end of each day.
 
-* Variables: reporting day, cumulative admissions, cumulative exits, active patients
-* Possible indicators: Active patients within facility per day, average active patients within facility per reporting period
-* Possible disaggregation: none (need to use dataTable_activePatients_withFilter.sql to apply any disaggregations)
-* Customization: inpatient visit type name*/
+ * Variables: reporting day, cumulative admissions, cumulative exits, active patients
+ * Possible indicators: Active patients within facility per day, average active patients within facility per reporting period
+ * Possible disaggregation: none (need to use dataTable_activePatients_withFilter.sql to apply any disaggregations)
+ * Customization: inpatient visit type name (row 20)*/
 
 WITH active_patients AS (
 	SELECT
@@ -50,7 +51,8 @@ SELECT
 	CASE
 	    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL 
 		THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
-	    ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
+	    ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-
+			sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
 	END AS active_patients
 FROM day_range
 LEFT OUTER JOIN daily_admissions ON day_range.day = daily_admissions.day

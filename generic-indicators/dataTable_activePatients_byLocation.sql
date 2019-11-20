@@ -1,10 +1,11 @@
 /*ABOUT
-* The active patients data table calculates the number of patients active within a service during the reporting period. Each row represents a day and patient counts at the end of each day.
+ * The active patients data table calculates the number of patients active within a service during the reporting period. 
+ * Each row represents a day and patient counts at the end of each day.
 
-* Variables: reporting day, cumulative admissions, cumulative exits, active patients
-* Possible indicators: Active patients within a service per day, average active patients within a service per reporting period
-* Possible disaggregation: none
-* Customization: inpatient location name*/
+ * Variables: reporting day, cumulative admissions, cumulative exits, active patients
+ * Possible indicators: Active patients within a service per day, average active patients within a service per reporting period
+ * Possible disaggregation: none
+ * Customization: inpatient visit type name (row 20)*/
 
 WITH active_patients AS (
 	SELECT

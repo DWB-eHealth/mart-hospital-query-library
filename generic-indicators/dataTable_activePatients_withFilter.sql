@@ -1,10 +1,11 @@
 /*ABOUT
-* The active patients data table calculates the number of patients active within the facility during the reporting period. Each row represents a day and patient counts at the end of each day.
+ * The active patients data table calculates the number of patients active within the facility during the reporting period. 
+ * Each row represents a day and patient counts at the end of each day.
 
-* Variables: reporting day, cumulative admissions, cumulative exits, active patients
-* Possible indicators: Active patients within facility per day, average active patients within facility per reporting period
-* Possible disaggregation: age group, sex, address fields (each category of the disaggregation should saved it's own data table within metabase)
-* Customization: inpatient visit type name, desired filter*/
+ * Variables: reporting day, cumulative admissions, cumulative exits, active patients
+ * Possible indicators: Active patients within facility per day, average active patients within facility per reporting period
+ * Possible disaggregation: age group, sex, address fields (each category of the disaggregation should saved it's own data table within metabase)
+ * Customization: inpatient visit type name (row 22), desired filter variable and filter category (row 24)*/
 
 WITH active_patients AS (
 	SELECT
@@ -19,7 +20,7 @@ WITH active_patients AS (
 		ON pvdd.patient_id = piv.patient_id
 /*The visit_type_name should be set to the visit type name used for inpatient visits with the EMR.*/
 	WHERE pvdd.visit_type_name = 'Hospital' 
-/*Add the desired filter from the patient_information_view table (e.g. sex, age group, origin)*/
+/*Add the desired filter variable (e.g. sex, age group, origin) and filter category (e.g. = 'M', < 5) from the patient_information_view table */
 		AND piv.gender = 'M'
 	ORDER BY pvdd.visit_start_date),
 range_values AS (

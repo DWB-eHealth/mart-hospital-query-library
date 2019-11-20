@@ -1,10 +1,12 @@
 /*ABOUT
-* The bed management data table is for counting the number of admissions to each inpatient department or service. Each row of the query represents the admission of a patient to a particular department or service. If a patient is admitted to multiple services during the visit, then there will be one row for each admission.
-
-* Variables: patient id, service, service admission date, service discharge date, length of stay (days), age at admission, sex, and address fields
-* Possible indicators: count of admissions by service, count of exits by service, average length of stay by service
+ * The bed management data table is for counting the number of admissions to each inpatient department or service. 
+ * Each row of the query represents the admission of a patient to a particular department or service. 
+ * If a patient is admitted to multiple services during the visit, then there will be one row for each admission.
+ 
+ * Variables: patient id, service, service admission date, service discharge date, length of stay (days), age at admission, sex, and address fields
+ * Possible indicators: count of admissions by service, count of exits by service, average length of stay by service
  * Possible disaggregation: age groups, sex, address fields
- * Customization to use the data table: address field names*/
+ * Customization: address variables and address coulmn names (rows 25 & 26)*/
 
 SELECT
 	bmlv.patient_id AS "patient id",
@@ -19,7 +21,7 @@ SELECT
 /*Age calcuated in Metabase is an estimate using January 1st of the birthyear and the start date of the visit.*/
     (date_part('year', age(bmlv.start_date, to_date((concat(piv.birthyear,'-01-01')), 'YYYY-MM-DD'))))::int AS "age at admission",
 	piv.gender AS "sex",
-/*The address columns (address1, address2, etc.) and address column names (region, commune, etc.) should be customized according to the address hierarchy used.*/
+/*The address variables (address1, address2, etc.) and address column names (region, commune, etc.) should be customized according to the address hierarchy used.*/
     piv.address4 AS "address name 1", 
     piv.address3 AS "address name 2"
 FROM bed_management_locations_view AS bmlv
