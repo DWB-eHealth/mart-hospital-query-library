@@ -2,8 +2,8 @@
 * The active patients data table calculates the number of patients active within the facility during the reporting period. Each row represents a day and patient counts at the end of each day.
 
 * Variables: reporting day, cumulative admissions, cumulative exits, active patients
-* Possible indicators: Active patients for entier facility per day, average active patients per reporting period
-* Possible disaggregation: none (need to use customized individual data tables to disaggregate)
+* Possible indicators: Active patients within facility per day, average active patients within facility per reporting period
+* Possible disaggregation: none (need to use dataTable_activePatients_withFilter.sql to apply any disaggregations)
 * Customization: inpatient visit type name*/
 
 WITH active_patients AS (
