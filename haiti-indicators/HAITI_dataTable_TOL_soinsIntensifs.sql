@@ -102,4 +102,4 @@ SELECT
 	(sum(active_patients)/sum(bed_count - missing_beds))*100 AS bed_occupancy_rate
 FROM inpatient_survice_days
 GROUP BY reporting_period
-ORDER BY reporting_period desc
+ORDER BY reporting_period
