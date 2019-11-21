@@ -12,7 +12,7 @@ Below is an index of the indicators that are possible with each data table query
 <ul>
 <li>count of admissions by service, age, sex, patient origin</li>
 <li>count of exits by service, age, sex, patient origin</li>
-<li>verage length of stay by service, age, sex, patient origin</li>
+<li>average length of stay by service, age, sex, patient origin</li>
 </ul>
 
 <h4>dataTable_activePatients.sql</h4>
