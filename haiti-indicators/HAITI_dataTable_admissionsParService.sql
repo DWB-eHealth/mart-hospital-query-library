@@ -6,7 +6,7 @@
  * Variables: patient id, service, service admission date, service discharge date, length of stay (days), sex, address fields, age (not yet available)
  * Possible indicators: count of admissions by service, count of exits by service, average length of stay by service
  * Possible disaggregation: sex, address fields, age (not yet available)
- * Customization: address variables and address coulmn names (rows 25 & 26)*/
+ * Customization: address variables and address column names (rows 25 & 26)*/
 
 SELECT 
 	DISTINCT ON (bmv.patient_id, bmv.date_started, bmv.location) bmv.patient_id AS "patient id",
