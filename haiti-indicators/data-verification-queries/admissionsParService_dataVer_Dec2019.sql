@@ -3,11 +3,6 @@ SELECT
 	pi."Patient_Identifier",
 	bmv.location AS "service",
 	bmv.date_started::date AS "service admission date",
-	bmv.date_stopped::date AS "service discharge date",
-	CASE
-		WHEN bmv.date_stopped::date - bmv.date_started::date = 0 THEN 1
-		ELSE bmv.date_stopped::date - bmv.date_started::date
-	END AS "length of stay (days)",
 	piv.gender AS "sex",
     piv.address4 AS "department", 
     piv.address3 AS "commune"
