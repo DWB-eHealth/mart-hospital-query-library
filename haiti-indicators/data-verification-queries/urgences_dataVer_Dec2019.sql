@@ -3,11 +3,7 @@ SELECT
 	pvdd.patient_id AS "patient id",
     pvdd.visit_type_name AS "visit type", 
     pvdd.visit_start_date AS "visit start date",
-	pvdd.visit_end_date AS "visit end date",
-	CASE
-		WHEN pvdd.visit_end_date::date - pvdd.visit_start_date::date = 0 THEN 1
-		ELSE pvdd.visit_end_date::date - pvdd.visit_start_date::date
-	END AS "length of stay (days)",
+    pvdd.visit_end_date AS "visit end date",
     piv.gender AS "sex",
     piv.address4 AS "department", 
     piv.address3 AS "commune"
