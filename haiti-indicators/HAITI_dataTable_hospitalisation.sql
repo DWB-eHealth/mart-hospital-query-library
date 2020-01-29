@@ -15,6 +15,7 @@ WITH admission_date AS (
 		visit_id,
 		gender,
 		age_at_bed_assignment,
+		birth_year, 
 		location, 
 		bed_assigned_date AS admission_date
 	FROM patient_bed_view
@@ -33,7 +34,11 @@ SELECT
 	ad.patient_id,
 	ad.visit_id,
 	ad.gender,
-	ad.age_at_bed_assignment AS age_at_admission,
+/*Age calcuated in Metabase is an estimate using January 1st of the birthyear and the date of first bed assignment.*/
+	CASE 
+		WHEN ad.birth_year IS NOT NULL THEN ad.age_at_bed_assignment 
+		ELSE NULL 
+	END AS age_at_admission,
 /*The address variables (address1, address2, etc.) and address column names (region, commune, etc.) should be customized according to the address hierarchy used.*/
 	piv.address4 AS "department", 
     piv.address3 AS "commune",
