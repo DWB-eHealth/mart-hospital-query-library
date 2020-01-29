@@ -1,7 +1,7 @@
 /*ABOUT
  * The visits data table is for counting the number of visits recorded in the EMR.
  * This query has been customized to only count 'Urgences' visit types.
- * Each row of the query represents a visit.
+ * Each row of the query represents an urgences visit.
  
  * Variables: patient id, visit type, visit start date, visit end date, length of stay (days), age at visit, sex, address fields
  * Possible indicators: count of visits (admissions or exits) by type, average length of stay
@@ -13,12 +13,12 @@ SELECT
     pvdd.visit_type_name AS "visit type", 
     pvdd.visit_start_date AS "visit start date",
 	pvdd.visit_end_date AS "visit end date",
-/*Length of stay in days calculates the number of days between admission and discharge. Admission and discharge on the same day is counted as 1 day*/
+/*Length of stay in days calculates the number of days between admission and discharge. Admission and discharge on the same day is counted as 1 day.*/
 	CASE
 		WHEN pvdd.visit_end_date::date - pvdd.visit_start_date::date = 0 THEN 1
 		ELSE pvdd.visit_end_date::date - pvdd.visit_start_date::date
 	END AS "length of stay (days)",
-/*Age calcuated in Metabase is an estimate using January 1st of the birthyear and the start date of the visit*/
+/*Age calcuated in Metabase is an estimate using January 1st of the birthyear and the start date of the visit.*/
     CASE
 		WHEN pdd.birthyear IS NOT NULL THEN (date_part('year', age(pvdd.visit_start_date, to_date((concat(pdd.birthyear,'-01-01')), 'YYYY-MM-DD'))))::int
 		ELSE NULL 
