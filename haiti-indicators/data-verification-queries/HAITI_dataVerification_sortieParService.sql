@@ -7,7 +7,7 @@
  * Customization: date range (row 31)*/
 
 SELECT 
-	DISTINCT ON (bmlv.patient_id, bmlv.start_date, bmlv.location) bmlv.patient_id AS "patient id",
+	DISTINCT ON (bmlv.patient_id, bmlv.discharge_date, bmlv.location) bmlv.patient_id AS "patient id",
 	pi."Patient_Identifier" AS "EMR id",
 	bmlv.location AS "service",
 	bmlv.start_date::date AS "service admission date",
@@ -39,5 +39,5 @@ LEFT OUTER JOIN person_details_default AS pdd
 LEFT OUTER JOIN patient_identifier AS pi
     on bmlv.patient_id = pi.patient_id
 /*The date range specified below can be changed depending on which reporting period needs to be verified.*/	
-WHERE bmlv.discharge_date::date >= '2020-01-01' and bmlv.discharge_date::date < '2020-02-01' and bmlv.discharge_date IS NOT NULL
-ORDER BY bmlv.patient_id, bmlv.discharge_date
+WHERE bmlv.discharge_date::date >= '2020-01-01' and bmlv.discharge_date::date < '2020-02-01' and bmlv.discharge_date != CURRENT_DATE
+ORDER BY bmlv.discharge_date, bmlv.patient_id
