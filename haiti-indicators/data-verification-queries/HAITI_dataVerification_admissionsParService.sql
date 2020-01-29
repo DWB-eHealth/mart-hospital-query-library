@@ -28,5 +28,5 @@ LEFT OUTER JOIN person_details_default AS pdd
 LEFT OUTER JOIN patient_identifier AS pi
     on bmlv.patient_id = pi.patient_id
 /*The date range specified below can be changed depending on which reporting period needs to be verified.*/	
-WHERE bmv.date_started::date >= '2020-01-01' and bmv.date_started::date < '2020-02-01'
+WHERE bmlv.start_date::date >= '2020-01-01' and bmlv.start_date::date < '2020-02-01'
 ORDER BY bmlv.patient_id, bmlv.start_date
