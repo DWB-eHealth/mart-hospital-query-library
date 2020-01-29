@@ -1,10 +1,11 @@
 /*ABOUT
  * The hospitalisation data table is for counting the number of admissions and discharges within the facility. 
  * Each row of the query represents the admission of a patient to the facility. 
+ * If the patient has been discharged, there will be a discharge date and length of stay in days.
  * If a patient is admitted to multiple times to the facility, then there will be one row for each admission.
  
- * Variables: patient id, visit_id, age, sex, address fields, admission location and date, discharge location and date, length of stay (days)
- * Possible indicators: count of admissions, count of discharges, average length of stay by service
+ * Variables: patient id, visit_id, age at admission, sex, address fields, admission location and date, discharge location and date, length of stay (days)
+ * Possible indicators: count of admissions, count of discharges, average length of stay
  * Possible disaggregation: age, sex, address fields
  * Customization: address variables and address coulmn names (rows 36 & 37)*/
 
@@ -33,13 +34,14 @@ SELECT
 	ad.visit_id,
 	ad.gender,
 	ad.age_at_bed_assignment AS age_at_admission,
+/*The address variables (address1, address2, etc.) and address column names (region, commune, etc.) should be customized according to the address hierarchy used.*/
 	piv.address4 AS "department", 
     piv.address3 AS "commune",
 	ad.location	AS admission_location,
 	ad.admission_date,
 	dd.location	AS discharge_location,
 	dd.discharge_date,
-	/*Length of stay in days calculates the number of days between admission and discharge. Admission and discharge on the same day is counted as 1 day.*/
+/*Length of stay in days calculates the number of days between admission and discharge. Admission and discharge on the same day is counted as 1 day.*/
 	CASE
 		WHEN dd.discharge_date::date IS NULL THEN NULL 
 		WHEN dd.discharge_date::date - ad.admission_date::date = 0 THEN 1
