@@ -39,5 +39,5 @@ LEFT OUTER JOIN person_details_default AS pdd
 LEFT OUTER JOIN patient_identifier AS pi
     on bmlv.patient_id = pi.patient_id
 /*The date range specified below can be changed depending on which reporting period needs to be verified.*/	
-WHERE bbmlv.discharge_date::date >= '2020-01-01' and bmlv.discharge_date::date < '2020-02-01' and bmlv.discharge_date IS NOT NULL
+WHERE bmlv.discharge_date::date >= '2020-01-01' and bmlv.discharge_date::date < '2020-02-01' and bmlv.discharge_date IS NOT NULL
 ORDER BY bmlv.patient_id, bmlv.discharge_date
