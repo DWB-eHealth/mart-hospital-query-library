@@ -8,7 +8,7 @@
 
 SELECT 
 	DISTINCT ON (bmlv.patient_id, bmlv.start_date, bmlv.location) bmlv.patient_id AS "patient id",
-	pi."Patient Identifier" AS "EMR id",
+	pi."Patient_Identifier" AS "EMR id",
 	bmlv.location AS "service",
 	bmlv.start_date::date AS "service admission date",
 	CASE 
