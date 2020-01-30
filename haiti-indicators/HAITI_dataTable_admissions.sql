@@ -41,7 +41,7 @@ SELECT
 	END AS age_at_admission,
 /*The address variables (address1, address2, etc.) and address column names (region, commune, etc.) should be customized according to the address hierarchy used.*/
 	piv.address4 AS "department", 
-    piv.address3 AS "commune",
+	piv.address3 AS "commune",
 	ad.location	AS admission_location,
 	ad.admission_date,
 	dd.location	AS discharge_location,
