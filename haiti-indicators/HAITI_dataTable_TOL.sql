@@ -102,8 +102,8 @@ SELECT
 /*To change the reporting period, 'month' can be changed to another reporting period (e.g. week, quarter, year).*/
 	date_trunc('month', reporting_day)::date AS reporting_period,
 /*The two rows below contain the components of the BOR calculation and can be used to check the calcualtion if needed.*/
-	sum(active_patients) AS inpatient_service_days,
-	sum(bed_count - missing_beds) AS bed_count_days,
+	/*sum(active_patients) AS inpatient_service_days,
+	sum(bed_count - missing_beds) AS bed_count_days,*/
 	(sum(active_patients)/sum(bed_count - missing_beds))*100 AS bed_occupancy_rate
 FROM inpatient_survice_days
 GROUP BY reporting_period
