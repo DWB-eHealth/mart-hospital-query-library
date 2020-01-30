@@ -7,10 +7,10 @@
  * Customization: date range (row 36)*/
  
 SELECT
-    pi."Patient_Identifier" AS "EMR id",
+	pi."Patient_Identifier" AS "EMR id",
 	pvdd.patient_id AS "patient id",
-    pvdd.visit_type_name AS "visit type", 
-    pvdd.visit_start_date AS "visit start date",
+	pvdd.visit_type_name AS "visit type", 
+	pvdd.visit_start_date AS "visit start date",
 	pvdd.visit_end_date AS "visit end date",
 /*Length of stay in days calculates the number of days between admission and discharge. Admission and discharge on the same day is counted as 1 day.*/
 	CASE
@@ -18,16 +18,16 @@ SELECT
 		ELSE pvdd.visit_end_date::date - pvdd.visit_start_date::date
 	END AS "length of stay (days)",
 /*Age calcuated in Metabase is an estimate using January 1st of the birthyear and the start date of the visit.*/
-    CASE
+	CASE
 		WHEN pdd.birthyear IS NOT NULL THEN (date_part('year', age(pvdd.visit_start_date, to_date((concat(pdd.birthyear,'-01-01')), 'YYYY-MM-DD'))))::int
 		ELSE NULL 
 	END AS "age at visit",
-    piv.gender AS "sex",
-    piv.address4 AS "department", 
-    piv.address3 AS "commune"
+	piv.gender AS "sex",
+	piv.address4 AS "department", 
+	piv.address3 AS "commune"
 FROM patient_visit_details_default AS pvdd
 LEFT OUTER JOIN patient_information_view AS piv
-    ON pvdd.patient_id = piv.patient_id
+	ON pvdd.patient_id = piv.patient_id
 LEFT OUTER JOIN person_details_default AS pdd
 	ON pvdd.patient_id = pdd.person_id 
 LEFT OUTER JOIN patient_identifier AS pi
