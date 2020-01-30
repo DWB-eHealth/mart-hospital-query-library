@@ -38,10 +38,10 @@ SELECT
 		ELSE NULL 
 	END AS age_at_admission,
 	piv.address4 AS "department", 
-    piv.address3 AS "commune",
-	ad.location	AS admission_location,
+	piv.address3 AS "commune",
+	ad.location AS admission_location,
 	ad.admission_date,
-	dd.location	AS discharge_location,
+	dd.location AS discharge_location,
 	dd.discharge_date,
 /*Length of stay in days calculates the number of days between admission and discharge. Admission and discharge on the same day is counted as 1 day.*/
 	CASE
@@ -53,9 +53,9 @@ FROM admission_date AS ad
 LEFT OUTER JOIN discharge_date AS dd
 	ON ad.patient_id = dd.patient_id AND ad.visit_id = dd.visit_id
 LEFT OUTER JOIN patient_information_view AS piv
-    ON ad.patient_id = piv.patient_id
+	ON ad.patient_id = piv.patient_id
 LEFT OUTER JOIN patient_identifier AS pi
-    on ad.patient_id = pi.patient_id
+	ON ad.patient_id = pi.patient_id
 /*The date range specified below can be changed depending on which reporting period needs to be verified.*/
 WHERE dd.discharge_date::date >= '2020-01-01' and dd.discharge_date::date < '2020-02-01' AND dd.discharge_date IS NOT NULL
 ORDER BY ad.patient_id, dd.discharge_date
