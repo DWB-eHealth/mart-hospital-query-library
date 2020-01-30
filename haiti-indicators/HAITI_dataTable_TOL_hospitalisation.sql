@@ -71,12 +71,12 @@ inpatient_survice_days AS (
 		day_range.day as reporting_day,
 		sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row) AS cumulative_admissions,
 		CASE
-		    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN 0
-		    ELSE sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) 
+			WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN 0
+			ELSE sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) 
 		END AS cumulative_exits, 
 		CASE
-		    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
-		    ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
+			WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
+			ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
 		END AS active_patients,
 		(SELECT
 			COUNT (cbdd.bed_id)
@@ -86,7 +86,7 @@ inpatient_survice_days AS (
 		CASE
 			WHEN (sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row) + sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row)) IS NULL THEN 0
 			WHEN sum(daily_excl_beds_end.stopped) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row)
-		    ELSE (sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row)-sum(daily_excl_beds_end.stopped) over (order by day_range.day asc rows between unbounded preceding and current row)) 
+			ELSE (sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row)-sum(daily_excl_beds_end.stopped) over (order by day_range.day asc rows between unbounded preceding and current row)) 
 		END AS missing_beds
 	FROM day_range
 	LEFT OUTER JOIN daily_admissions ON day_range.day = daily_admissions.day
