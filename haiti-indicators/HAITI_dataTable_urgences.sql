@@ -9,19 +9,19 @@
  * Customization: address variables and address coulmn names (rows 24 & 25), visit type name (row 30)*/
  
 SELECT
-    pvdd.patient_id AS "patient id",
-    pvdd.visit_type_name AS "visit type", 
-    pvdd.visit_start_date AS "visit start date",
+	pvdd.patient_id AS "patient id",
+	pvdd.visit_type_name AS "visit type", 
+	pvdd.visit_start_date AS "visit start date",
 	pvdd.visit_end_date AS "visit end date",
 /*Age calcuated in Metabase is an estimate using January 1st of the birthyear and the start date of the visit.*/
 	CASE
 		WHEN pdd.birthyear IS NOT NULL THEN (date_part('year', age(pvdd.visit_start_date, to_date((concat(pdd.birthyear,'-01-01')), 'YYYY-MM-DD'))))::int
 		ELSE NULL 
 	END AS "age at visit",
-    piv.gender AS "sex",
+	piv.gender AS "sex",
 /*The address variables (address1, address2, etc.) and address column names (region, commune, etc.) should be customized according to the address hierarchy used.*/
-    piv.address4 AS "department", 
-    piv.address3 AS "commune"
+	piv.address4 AS "department", 
+	piv.address3 AS "commune"
 FROM patient_visit_details_default AS pvdd
 LEFT OUTER JOIN patient_information_view AS piv
 	ON pvdd.patient_id = piv.patient_id
