@@ -29,14 +29,14 @@ SELECT
 		ELSE NULL 
 	END AS age_at_admission,
 	piv.address4 AS "department", 
-    piv.address3 AS "commune",
+	piv.address3 AS "commune",
 	ad.location	AS admission_location,
 	ad.admission_date
 FROM admission_date AS ad 
 LEFT OUTER JOIN patient_information_view AS piv
-    ON ad.patient_id = piv.patient_id
+	ON ad.patient_id = piv.patient_id
 LEFT OUTER JOIN patient_identifier AS pi
-    on ad.patient_id = pi.patient_id
+	ON ad.patient_id = pi.patient_id
 /*The date range specified below can be changed depending on which reporting period needs to be verified.*/
 WHERE ad.admission_date::date >= '2020-01-01' and ad.admission_date::date < '2020-02-01'
 ORDER BY ad.patient_id, ad.admission_date
