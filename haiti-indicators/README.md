@@ -1,9 +1,9 @@
 ## Summary of Data Tables for Haiti Bahmni-Mart
 #### dataTable_urgences
-This data table can be used to count emergency department visits and can be disaggregated by sex and patient origin. The table also includes length of stay - this is not interesting as an indicator but can be used to check data quality to make sure that emergency visits are being closed as expected.
+This data table can be used to count emergency department visits and can be disaggregated by age, sex and patient origin.
 
-#### dataTable_hospitalisation
-This data table can be used to count admissions and discharges to the entire hospital. It can also calculate average length of stay. These indicators can be disaggregated by age, sex and patient origin. There are also columns for the location of admission and location of discharge to look at where patients first enter the hospital and where they exist the hospital from. 
+#### dataTable_admissions
+This data table can be used to count admissions and discharges to the entire hospital. It can also be used to calculate average length of stay. These indicators can be disaggregated by age, sex and patient origin. There are also columns for the location of admission and location of discharge to look at where patients first enter the hospital and where they exist the hospital from. 
 
 #### dataTable_admissionsParService
 This data table can be used to calculate admissions to each service and the average length of stay within each service. These indicators can be disaggregated by sex and patient origin. When creating an indicator, filter by service name.
