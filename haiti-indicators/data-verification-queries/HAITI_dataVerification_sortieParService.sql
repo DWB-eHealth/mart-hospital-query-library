@@ -29,15 +29,15 @@ SELECT
 		ELSE NULL 
 	END AS "age at admission",
 	piv.gender AS "sex",
-    piv.address4 AS "department", 
-    piv.address3 AS "commune"
+	piv.address4 AS "department", 
+	piv.address3 AS "commune"
 FROM bed_management_locations_view AS bmlv
 LEFT OUTER JOIN patient_information_view AS piv
-    ON bmlv.patient_id = piv.patient_id
+	ON bmlv.patient_id = piv.patient_id
 LEFT OUTER JOIN person_details_default AS pdd 
 	ON bmlv.patient_id = pdd.person_id 
 LEFT OUTER JOIN patient_identifier AS pi
-    on bmlv.patient_id = pi.patient_id
+	ON bmlv.patient_id = pi.patient_id
 /*The date range specified below can be changed depending on which reporting period needs to be verified.*/	
 WHERE bmlv.discharge_date::date >= '2020-01-01' and bmlv.discharge_date::date < '2020-02-01' and bmlv.discharge_date != CURRENT_DATE
 ORDER BY bmlv.discharge_date, bmlv.patient_id
