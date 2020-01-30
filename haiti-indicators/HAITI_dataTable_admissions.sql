@@ -56,4 +56,4 @@ FROM admission_date AS ad
 LEFT OUTER JOIN discharge_date AS dd
 	ON ad.patient_id = dd.patient_id AND ad.visit_id = dd.visit_id
 LEFT OUTER JOIN patient_information_view AS piv
-    ON ad.patient_id = piv.patient_id
+	ON ad.patient_id = piv.patient_id
