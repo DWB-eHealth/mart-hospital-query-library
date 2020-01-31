@@ -1,5 +1,5 @@
 ## Summary of Data Tables for Iraq Bahmni-Mart
-#### dataTable_MLO+AdmissionCommittee
+#### dataTable_MLOVisit
 This data table can be used when creating indicators that connect information collected in the MLO Medical Assessment form with the Admission Committee form. This also allows for averaging differences in days between MLO assessment and injury or last surgery.
 
 #### dataTable_activePatients_OPD / dataTable_activePatients_IPD
