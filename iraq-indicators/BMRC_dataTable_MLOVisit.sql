@@ -42,3 +42,4 @@ LEFT OUTER JOIN patient_information_view AS piv
 	ON mlo.patient_id = piv.patient_id
 LEFT OUTER JOIN adm_committee AS adm
 	ON mlo.visit_id = adm.visit_id
+ORDER BY mlo.date_of_assessment::timestamp  
