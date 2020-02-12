@@ -27,13 +27,13 @@ WITH active_patients AS (
 		ia.patient_id,
 		ia.date_of_admission::date AS visit_start_date,
 		CASE
-				WHEN id.date_of_discharge NOTNULL THEN id.date_of_discharge::date
-				ELSE CURRENT_DATE 
+			WHEN id.date_of_discharge NOTNULL THEN id.date_of_discharge::date
+			ELSE CURRENT_DATE 
 		END AS visit_end_date
 	FROM ipd_admission AS ia
 	LEFT OUTER JOIN ipd_discharge AS id
 		ON ia.visit_id = id.visit_id
-	ORDER BY ia.date_of_admission::timestamp)),
+	ORDER BY ia.date_of_admission::timestamp),
 range_values AS (
 	SELECT 
 		date_trunc('day',min(ap.visit_start_date)) AS minval,
@@ -59,15 +59,12 @@ SELECT
 	day_range.day as reporting_day,
 	/*sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row) AS cumulative_admissions,
 	CASE
-	    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL
-	    THEN 0
-	    ELSE sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) 
+		WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN 0
+		ELSE sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) 
 	END AS cumulative_exits,*/ 
 	CASE
-	    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL 
-		THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
-	    ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-
-			sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
+		WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
+		ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
 	END AS active_patients
 FROM day_range
 LEFT OUTER JOIN daily_admissions ON day_range.day = daily_admissions.day
