@@ -16,7 +16,7 @@ FROM (SELECT
 		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', pvev.visit_start_date)) ORDER BY pvev.age_at_visit, pvev.person_id) AS rows_ascending,
 		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', pvev.visit_start_date)) ORDER BY pvev.age_at_visit DESC, pvev.person_id DESC) AS rows_descending
 	FROM patient_visits_encounters_view AS pvev
-	WHERE pvev.visit_type = 'OPD') AS foo
+	WHERE pvev.visit_type = 'MLO') AS foo
 WHERE rows_ascending BETWEEN rows_descending - 1 AND rows_descending + 1
 GROUP BY visit_period
 ORDER BY visit_period
