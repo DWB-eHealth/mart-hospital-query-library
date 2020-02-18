@@ -70,3 +70,4 @@ SELECT
 FROM day_range
 LEFT OUTER JOIN daily_admissions ON day_range.day = daily_admissions.day
 LEFT OUTER JOIN daily_exits ON day_range.day = daily_exits.day
+ORDER BY day_range.day DESC
