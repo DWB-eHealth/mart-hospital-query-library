@@ -1,4 +1,14 @@
 /*ABOUT
+* The MLO + Admission Committee data table connects information enter in the two forms together.
+* Each row represents a MLO encounter and the admission committee data if availble.
+* If a patient has been assessed by an MLO and/or reviewed by the admission committee more than once, there will be multiple lines for this patient.
+
+* Variables: patient ID, sex, date of MLO assessment, type of MLO assessment, hospital of origin, date of injury, days between injury and MLO assessment, cause of injury, date of injury, date of last surgery, days between last surgery and MLO assessment, date of presentation to admission committee, outcome of admission committee, requested location of admission, reason for refusal
+* Possible indicators: patients assessed by MLO by sex, average delay between injury and MLO assessment, average delay between last surgery and MLO assessment, cases by hospital of origin and admission committee outcome
+* Possible disaggregation: sex
+* Customization: none */
+
+/*ABOUT
  * The active patients data table calculates the number of patients active within the facility during the reporting period. 
  * Each row represents a day and patient counts at the end of each day.
  
@@ -22,13 +32,14 @@ WITH active_patients AS (
 			pedd.visit_id 
 		FROM opd_progress_note_md AS opn
 		LEFT OUTER JOIN patient_encounter_details_default AS pedd 
-			ON opn.encounter_id = pedd.encounter_id)
+			ON opn.encounter_id = pedd.encounter_id
+		WHERE opn.date_of_discharge IS NOT NULL)
 	SELECT 
 		oa.patient_id,
 		oa.date_of_admission::date AS visit_start_date,
 		CASE
-				WHEN od.date_of_discharge NOTNULL THEN od.date_of_discharge::date
-				ELSE CURRENT_DATE 
+			WHEN od.date_of_discharge NOTNULL THEN od.date_of_discharge::date
+			ELSE CURRENT_DATE 
 		END AS visit_end_date
 	FROM opd_admission AS oa
 	LEFT OUTER JOIN opd_discharge AS od
@@ -59,16 +70,14 @@ SELECT
 	day_range.day as reporting_day,
 	/*sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row) AS cumulative_admissions,
 	CASE
-	    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL
-	    THEN 0
-	    ELSE sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) 
+		WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN 0
+		ELSE sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) 
 	END AS cumulative_exits,*/ 
 	CASE
-	    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL 
-		THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
-	    ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-
-			sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
+		WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
+		ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)- sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
 	END AS active_patients
 FROM day_range
 LEFT OUTER JOIN daily_admissions ON day_range.day = daily_admissions.day
-LEFT OUTER JOIN daily_exits ON day_range.day = daily_exits.day
+LEFT OUTER JOIN daily_exits ON day_range.day = daily_exits.DAY
+ORDER BY day_range.DAY DESC 
