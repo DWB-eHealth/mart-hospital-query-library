@@ -1,14 +1,4 @@
 /*ABOUT
-* The MLO + Admission Committee data table connects information enter in the two forms together.
-* Each row represents a MLO encounter and the admission committee data if availble.
-* If a patient has been assessed by an MLO and/or reviewed by the admission committee more than once, there will be multiple lines for this patient.
-
-* Variables: patient ID, sex, date of MLO assessment, type of MLO assessment, hospital of origin, date of injury, days between injury and MLO assessment, cause of injury, date of injury, date of last surgery, days between last surgery and MLO assessment, date of presentation to admission committee, outcome of admission committee, requested location of admission, reason for refusal
-* Possible indicators: patients assessed by MLO by sex, average delay between injury and MLO assessment, average delay between last surgery and MLO assessment, cases by hospital of origin and admission committee outcome
-* Possible disaggregation: sex
-* Customization: none */
-
-/*ABOUT
  * The active patients data table calculates the number of patients active within the facility during the reporting period.
  * Each row represents a day and patient counts at the end of each day.
 
