@@ -22,7 +22,8 @@ WITH active_patients AS (
 			pedd.visit_id 
 		FROM ipd_progress_note_md AS ipn
 		LEFT OUTER JOIN patient_encounter_details_default AS pedd 
-			ON ipn.encounter_id = pedd.encounter_id)
+			ON ipn.encounter_id = pedd.encounter_id
+		WHERE ipn.date_of_discharge IS NOT NULL)
 	SELECT 
 		ia.patient_id,
 		ia.date_of_admission::date AS visit_start_date,
