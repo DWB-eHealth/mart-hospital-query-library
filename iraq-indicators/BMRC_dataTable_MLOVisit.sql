@@ -24,6 +24,7 @@ adm_committee AS (
 		ON ac.encounter_id = pedd.encounter_id)
 SELECT 
 	mlo.patient_id,
+	mlo.visit_id,
 	piv.gender AS sex,
 	mlo.date_of_assessment,
 	mlo.type_of_assessment,
