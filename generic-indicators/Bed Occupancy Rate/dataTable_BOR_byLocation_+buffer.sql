@@ -2,7 +2,7 @@
 * The bed occupancy rate data table calculates the percentage of beds occupied during the reporting period. Each row represents the reporting period defined in the query.
 * Bed occupancy rate is based on the inpatient service days (sum of hospitalized patients per day during reporting period) and the bed count days (sum of beds per day of reporting period).
 * Bed count days is a sum of standard ward beds, plus any buffer beds currently in use, minus any out-of-service beds.
-* Note that if the total number of beds configured within the EMR has changed, then the dataTable_BOR_static.sql or dataTable_BOR_byLocation_static.sql query should be used. 
+* Note that if the total number of beds configured within the EMR has changed, then the dataTable_BOR_byLocation_+buffer_static.sql query should be used. 
 
 * Variables: reporting period, bed occupancy rate
 * Possible indicators: Bed occupancy rate for a location per reporting period
