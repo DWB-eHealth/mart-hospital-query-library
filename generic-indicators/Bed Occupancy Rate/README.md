@@ -7,6 +7,7 @@ Depending on the configuration of the Bed Management module within Bahmni and th
 >{**inpatient service days**} * 100 / {**inpatient bed count days**}
 
 >**inpatient service days**: sum of hospitalized patients per day during reporting period
+
 >**inpatient bed count days**: sum of beds per day of reporting period
 
 <h4>List of Possible BOR Queries</h4>
