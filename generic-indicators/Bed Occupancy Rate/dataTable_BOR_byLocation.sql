@@ -1,12 +1,13 @@
- /*ABOUT
+/* ABOUT
 * The bed occupancy rate data table calculates the percentage of beds occupied during the reporting period. Each row represents the reporting period defined in the query.
 * Bed occupancy rate is based on the inpatient service days (sum of hospitalized patients per day during reporting period) and the bed count days (sum of beds per day of reporting period).
-* Note that if the total number of beds has been changed within the EMR, then the dataTable_BOR_static.sql or dataTable_BOR_byLocation_static.sqlquery should be used. 
+* Bed count days is a sum of standard ward beds minus any out-of-service beds.
+* Note that if the total number of beds configured within the EMR has changed, then the dataTable_BOR_static.sql or dataTable_BOR_byLocation_static.sql query should be used. 
 
 * Variables: reporting period, bed occupancy rate
 * Possible indicators: Bed occupancy rate for a location per reporting period
 * Possible disaggregation: location
-* Customization: inpatient location names (row 21), missing bed tag name (row 32), missing bed locations (row 34), bed count locations (row 85), reporting period unit (weeks, months, etc.) (row 97)*/
+* Customization: inpatient location names (row 22), out-of-service tag name (row 33), out-of-service bed locations (row 35), bed count locations (row 86), reporting period unit (weeks, months, etc.) (row 98)*/
 
 WITH active_patients AS (
 	SELECT
@@ -28,9 +29,9 @@ exclude_beds AS (
 			ELSE current_date
 		END AS date_stopped
 	FROM bed_tags_default AS btd
-/*The bed_tag_name should be set to bed tags of beds that should not be counted during the reporting period*/
+/*The bed_tag_name should be set to bed tags that should not be counted during the reporting period (e.g. beds that are out-of-service)*/
 	WHERE btd.bed_tag_name = 'Lost'
-/*The bed_location should match the inpatient location(s) set in line 21*/	
+/*The bed_location should match the inpatient location(s) set in line 22*/	
 	AND (btd.bed_location = 'Ward (2nd floor)' OR btd.bed_location = 'Ward (3rd floor)')
 	ORDER BY btd.date_created),
 range_values AS (
@@ -81,7 +82,7 @@ inpatient_survice_days AS (
 		(SELECT
 			COUNT (cbdd.bed_id)
 		FROM current_bed_details_default AS cbdd
-/*The location should be set to the inpatient location the active patient query should calculate. Same as row 21*/
+/*The location should be set to the inpatient location the active patient query should calculate. Same as row 22*/
 		WHERE cbdd.bed_location = 'Ward (2nd floor)' OR cbdd.bed_location = 'Ward (3rd floor)') AS bed_count,
 		CASE
 		    WHEN sum(daily_excl_beds_end.stopped) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row)
