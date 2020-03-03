@@ -106,7 +106,7 @@ inpatient_survice_days AS (
 		(SELECT
 			COUNT (cbdd.bed_id)
 		FROM current_bed_details_default AS cbdd
-/*The location should be set to the inpatient location the active patient query should calculate. Same as row 21*/
+/*The location should be set to the inpatient location the active patient query should calculate. Same as row 22*/
 		WHERE cbdd.bed_location = 'Kahramana(1st floor)' OR cbdd.bed_location = 'Kahramana(2nd floor)') AS bed_count,
 		CASE
 		    WHEN sum(daily_excl_beds_end.stopped) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row)

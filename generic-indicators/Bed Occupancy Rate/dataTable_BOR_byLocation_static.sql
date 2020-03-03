@@ -1,12 +1,13 @@
  /*ABOUT
 * The bed occupancy rate data table calculates the percentage of beds occupied during the reporting period. Each row represents the reporting period defined in the query.
 * Bed occupancy rate is based on the inpatient service days (sum of hospitalized patients per day during reporting period) and the bed count days (sum of beds per day of reporting period).
+* Bed count days is a sum of standard ward beds minus any out-of-service beds.
 * Note that this query should only be used if the number of beds has changed overtime. Otherwise, the dynamic BOR query should be used. 
 
 * Variables: reporting period, bed occupancy rate
 * Possible indicators: Bed occupancy rate for a location per reporting period
 * Possible disaggregation: location
-* Customization: inpatient location names (row 21), missing bed tag name (row 32), missing bed locations (row 34), static bed count and time frame (rows 81-82), bed count locations (row 85), reporting period unit (weeks, months, etc.) (row 97)*/
+* Customization: inpatient location names (row 22), out-of-service bed tag name (row 33), out-of-service bed locations (row 35), static bed count and time frame (rows 84-85), bed count locations (row 85), reporting period unit (weeks, months, etc.) (row 99)*/
 
 WITH active_patients AS (
 	SELECT
@@ -28,9 +29,9 @@ exclude_beds AS (
 			ELSE current_date
 		END AS date_stopped
 	FROM bed_tags_default AS btd
-/*The bed_tag_name should be set to bed tags of beds that should not be counted during the reporting period*/
+/*The bed_tag_name should be set to bed tags that should not be counted during the reporting period (e.g. beds that are out-of-service)*/
 	WHERE btd.bed_tag_name = 'Lost'
-/*The bed_location should match the inpatient location(s) set in line 21*/	
+/*The bed_location should match the inpatient location(s) set in line 22*/	
 	AND (btd.bed_location = 'Ward (2nd floor)' OR btd.bed_location = 'Ward (3rd floor)')
 	ORDER BY btd.date_created),
 range_values AS (
