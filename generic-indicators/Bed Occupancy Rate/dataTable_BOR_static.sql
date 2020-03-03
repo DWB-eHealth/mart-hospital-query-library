@@ -1,12 +1,13 @@
  /*ABOUT
 * The bed occupancy rate data table calculates the percentage of beds occupied during the reporting period. Each row represents the reporting period defined in the query.
 * Bed occupancy rate is based on the inpatient service days (sum of hospitalized patients per day during reporting period) and the bed count days (sum of beds per day of reporting period).
-* Note that this query should only be used if the number of beds has changed overtime. Otherwise, the dynamic BOR query should be used. 
+* Bed count days is a sum of standard ward beds minus any out-of-service beds.
+* Note that this query should only be used if the number of beds configured in the EMR has changed overtime. Otherwise, the dynamic BOR query should be used. 
 
 * Variables: reporting period, bed occupancy rate
 * Possible indicators: Bed occupancy rate for the facility per reporting period
 * Possible disaggregation: none (to disaggregate by service, the dataTable_BOR_byLocation.sql should be used)
-* Customization: inpatient visit type name (row 20), missing bed tag name (row 32), static bed count and time frame (rows 81-82), reporting period unit (weeks, months, etc.) (row 96)*/
+* Customization: inpatient visit type name (row 22), out-of-service bed tag name (row 33), static bed count and time frame (rows 82), reporting period unit (weeks, months, etc.) (row 98)*/
 
 WITH active_patients AS (
 	SELECT
@@ -76,11 +77,12 @@ inpatient_survice_days AS (
 		    WHEN sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)
 		    ELSE (sum(daily_admissions.patients) over (order by day_range.day asc rows between unbounded preceding and current row)-sum(daily_exits.patients) over (order by day_range.day asc rows between unbounded preceding and current row)) 
 		END AS active_patients,
-/*If the number of beds that have been set up within the EMR have changed over time, the number during each period needs to be coded into the query. The timeframe and number of beds can be added below.*/
+/*If the number of beds configured within the EMR has changed over time, the number(s) prior to the last change need to be hard-coded. The timeframe and number of beds can be added below.*/
 		CASE
-			WHEN day_range.day BETWEEN '2019-11-01' AND CURRENT_date THEN 53
-			WHEN day_range.day BETWEEN '2019-01-01' AND '2019-10-31' THEN 55
-			ELSE null
+			WHEN day_range.day <= '2019-11-01' THEN 53
+			ELSE (SELECT
+				COUNT (bed_id)
+			FROM current_bed_details_default)
 		END AS bed_count,
 		CASE
 		    WHEN sum(daily_excl_beds_end.stopped) over (order by day_range.day asc rows between unbounded preceding and current row) IS NULL THEN sum(daily_excl_beds_start.started) over (order by day_range.day asc rows between unbounded preceding and current row)
