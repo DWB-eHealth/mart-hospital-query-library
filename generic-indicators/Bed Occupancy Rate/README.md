@@ -1,14 +1,14 @@
 <h2>Bed Occupancy Rate Queries</h2>
 
-Bed Occupancy Rate (BOR) is a core hospital indicator for inpatient services. This indicator is used to provide information on the functional ability of the facility and efficient use of resources within the facility. 
+Bed Occupancy Rate (BOR) is a core hospital indicator for inpatient services. This indicator is used to provide information on the functional ability of the facility and efficient use of resources within the facility.
 
 Depending on the configuration of the Bed Management module within Bahmni and the use of this module overtime, there are a couple variations in BOR SQL queries that are possible. Below is a summary of these possible variations and when to use each. All queries use the same standard formula:
 
 >BOR = {**inpatient service days**} * 100 / {**inpatient bed count days**}
 
-  >**inpatient service days**: sum of hospitalized patients per day during reporting period
+  >**inpatient service days**: sum of patients present in the facility per day during the reporting period
 
-  >**inpatient bed count days**: sum of beds per day of reporting period
+  >**inpatient bed count days**: sum of beds per day during the reporting period. The sum of beds per day excludes beds that are out-of-service.
 
 <h4>List of Possible BOR Queries</h4>
   <h5>dataTable_BOR_dynamic.sql / dataTable_BOR_static.sql</h5>
