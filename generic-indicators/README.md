@@ -1,44 +1,28 @@
-<h2>Data Table Index</h2>
+<h2>Generic Indicator Data Table Index</h2>
 
-Below is an index of the indicators that are possible with each data table query contained in the metabase-query-library/generic-indicators folder:
+Below is a list of indicators that need custom SQL queries in order to calculate. Each indicator folder contains possible variations for each.
 
-<h4>dataTable_visits.sql</h4>
-<ul>
-<li>count of visits by visit type, age, sex, patient origin</li>
-<li>average length of stay by visit type, age, sex, patient origin</li>
-</ul>
-
-<h4>dataTable_bedManagement.sql</h4>
-<ul>
-<li>count of admissions by service, age, sex, patient origin</li>
-<li>count of exits by service, age, sex, patient origin</li>
-<li>average length of stay by service, age, sex, patient origin</li>
-</ul>
-
-<h4>dataTable_activePatients.sql</h4>
+<h4>Active Patients</h4>
 <ul>
 <li>count of active patients per day</li>
 <li>average number of active patients during reporting period</li>
+<li>can be disaggregated by inpatient service or patient demographics</li>
 </ul>
 
-<h4>dataTable_activePatients_withFilter.sql</h4>
+<h4>Average Length of Stay</h4>
 <ul>
-<li>count of active patients per day by age group, sex, patient origin</li>
-<li>average number of active patients during reporting period by age group, sex, patient origin</li>
+<li>average length of stay during reporting period</li>
+<li>can be disaggregated by inpatient service or partient demographics</li>
 </ul>
 
-<h4>dataTable_activePatients_byLocation.sql</h4>
+<h4>Bed Occupancy Rate</h4>
 <ul>
-<li>count of active patients per day by service</li>
-<li>average number of active patients during reporting period by service</li>
+<li>bed occupancy rate per reporting period</li>
+<li>can be disaggregated by inpatient service</li>
 </ul>
 
-<h4>dataTable_BOR.sql / dataTable_BOR_static.sql</h4>
+<h4>Miscellaneous</h4>
 <ul>
-<li>bed occupancy rate per reporting period for all inpatient services</li>
-</ul>
-
-<h4>dataTable_BOR_byLocation.sql / dataTable_BOR_byLocation_static.sql</h4>
-<ul>
-<li>bed occupancy rate per location and reporting period </li>
+<li>contains example if queries that can be applied to different subjects/contexts</li>
+<li>examples include, median queries...</li>
 </ul>
