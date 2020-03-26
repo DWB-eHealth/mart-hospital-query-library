@@ -11,10 +11,10 @@ SELECT
 	visit_period,
 	ROUND(AVG(age),2) AS median_age
 FROM (SELECT
-		DISTINCT ON (pvev.person_id, pvev.visit_id) date_trunc('Month', pvev.visit_start_date) AS visit_period,
+		DISTINCT ON (pvev.patient_id, pvev.visit_id) date_trunc('Month', pvev.visit_start_date) AS visit_period,
 		pvev.age_at_visit::int AS age,
-		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', pvev.visit_start_date)) ORDER BY pvev.age_at_visit, pvev.person_id) AS rows_ascending,
-		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', pvev.visit_start_date)) ORDER BY pvev.age_at_visit DESC, pvev.person_id DESC) AS rows_descending
+		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', pvev.visit_start_date)) ORDER BY pvev.age_at_visit, pvev.patient_id) AS rows_ascending,
+		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', pvev.visit_start_date)) ORDER BY pvev.age_at_visit DESC, pvev.patient_id DESC) AS rows_descending
 	FROM patient_visits_encounters_view AS pvev
 	WHERE pvev.visit_type = 'MLO') AS foo
 WHERE rows_ascending BETWEEN rows_descending - 1 AND rows_descending + 1
