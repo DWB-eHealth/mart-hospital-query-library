@@ -1,4 +1,4 @@
-## Summary of Data Tables for Iraq Bahmni-Mart
+## Summary of Data Tables for IQ Bahmni-Mart
 #### dataTable_MLOVisit
 This data table can be used when creating indicators that connect information collected in the MLO Medical Assessment form with the Admission Committee form. This also allows for averaging differences in days between MLO assessment and injury or last surgery.
 
@@ -6,4 +6,4 @@ This data table can be used when creating indicators that connect information co
 This data table can be used to see the active number of patients over time in the OPD or IPD
 
 #### dataTable_medianAgeAtAdmission
-This data table can be used to see the median age of admission. The calculation is made on a monthly basis. 
+This data table can be used to see the median age of admission. The calculation is made on a monthly basis.
