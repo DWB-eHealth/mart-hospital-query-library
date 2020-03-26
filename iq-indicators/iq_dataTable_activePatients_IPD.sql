@@ -8,33 +8,18 @@
  * Customization: none*/
 
 WITH active_patients AS (
-	WITH ipd_admission AS (
-		SELECT 
-			ime.*,
-			pedd.visit_id 
-		FROM initial_medical_examination AS ime
-		LEFT OUTER JOIN patient_encounter_details_default AS pedd
-			ON ime.encounter_id = pedd.encounter_id
-		WHERE ime.date_of_admission IS NOT NULL AND ime.patient_admitted_to = 'IPD'),
-	ipd_discharge AS (
-		SELECT 
-			ipn.*,
-			pedd.visit_id 
-		FROM ipd_progress_note_md AS ipn
-		LEFT OUTER JOIN patient_encounter_details_default AS pedd 
-			ON ipn.encounter_id = pedd.encounter_id
-		WHERE ipn.date_of_discharge IS NOT NULL)
 	SELECT 
-		ia.patient_id,
-		ia.date_of_admission::date AS visit_start_date,
+		ime.patient_id,
+		ime.date_of_admission::date AS visit_start_date,
 		CASE
-			WHEN id.date_of_discharge NOTNULL THEN id.date_of_discharge::date
+			WHEN ipn.date_of_discharge NOTNULL THEN ipn.date_of_discharge::date
 			ELSE CURRENT_DATE 
 		END AS visit_end_date
-	FROM ipd_admission AS ia
-	LEFT OUTER JOIN ipd_discharge AS id
-		ON ia.visit_id = id.visit_id
-	ORDER BY ia.date_of_admission::timestamp),
+	FROM initial_medical_examination AS ime
+	LEFT OUTER JOIN ipd_progress_note_md AS ipn
+		ON ime.visit_id = ipn.visit_id
+	WHERE ime.date_of_admission IS NOT NULL AND ime.patient_admitted_to = 'IPD'
+	ORDER BY ime.date_of_admission::timestamp),
 range_values AS (
 	SELECT 
 		date_trunc('day',min(ap.visit_start_date)) AS minval,
