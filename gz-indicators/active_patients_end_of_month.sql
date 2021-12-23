@@ -51,7 +51,7 @@ daily_active_patients AS (
 	LEFT OUTER JOIN daily_enrollments ON day_range.day = daily_enrollments.day
 	LEFT OUTER JOIN daily_exits ON day_range.day = daily_exits.DAY)
 SELECT 
-	dap.reporting_day,
+	dap.reporting_day::date,
 	dap.active_patients
 FROM daily_active_patients dap
 WHERE dap.last_day_of_month = 1
