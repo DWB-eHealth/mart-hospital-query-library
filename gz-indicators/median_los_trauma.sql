@@ -47,18 +47,9 @@ cte_cohort AS (
 		ON ppdd.patient_program_id = cfc.patient_program_id
 	LEFT OUTER JOIN cte_initial_medical_assessment cima 
 		ON ppdd.patient_program_id = cima.patient_program_id
-	WHERE ppdd.voided = 'false' AND ppdd.program_id = 1 AND ppdd.date_completed IS NOT NULL),
-cte_median AS (
-	SELECT 
-		DATE_TRUNC('Month', date_completed) AS record_month_completed,
-		los_days,
-		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', date_completed)) ORDER BY los_days, patient_program_id) AS rows_ascending,
-		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', date_completed)) ORDER BY los_days DESC, patient_program_id DESC) AS rows_descending
-	FROM cte_cohort)
-SELECT
-	cm.record_month_completed,
-	ROUND(AVG(cm.los_days), 2) AS median_los
-FROM cte_median cm
-WHERE rows_ascending BETWEEN rows_descending - 1 AND rows_descending + 1
-GROUP BY cm.record_month_completed
-ORDER BY cm.record_month_completed
+	WHERE ppdd.voided = 'false' AND ppdd.program_id = 1 AND ppdd.date_completed IS NOT NULL)
+SELECT 
+	DATE_TRUNC('Month', cc.date_completed) AS record_month_completed,
+	percentile_cont(0.5) WITHIN GROUP (ORDER BY cc.los_days) 
+FROM cte_cohort cc
+GROUP BY DATE_TRUNC('Month', cc.date_completed)
