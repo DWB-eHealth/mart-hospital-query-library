@@ -47,18 +47,9 @@ cte_cohort AS (
 		ON ppdd.patient_program_id = cfc.patient_program_id
 	LEFT OUTER JOIN cte_initial_medical_assessment cima 
 		ON ppdd.patient_program_id = cima.patient_program_id
-	WHERE ppdd.voided = 'false' AND ppdd.program_id = 1),
-cte_median AS (
-	SELECT 
-		DATE_TRUNC('Month', date_enrolled) AS record_month_enrollment,
-		day_diff_injury_admission,
-		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', date_enrolled)) ORDER BY day_diff_injury_admission, patient_program_id) AS rows_ascending,
-		ROW_NUMBER() OVER (PARTITION BY (DATE_TRUNC('Month', date_enrolled)) ORDER BY day_diff_injury_admission DESC, patient_program_id DESC) AS rows_descending
-	FROM cte_cohort)
-SELECT
-	cm.record_month_enrollment,
-	ROUND(AVG(cm.day_diff_injury_admission), 2) AS median_day_diff
-FROM cte_median cm
-WHERE rows_ascending BETWEEN rows_descending - 1 AND rows_descending + 1
-GROUP BY cm.record_month_enrollment
-ORDER BY cm.record_month_enrollment
+	WHERE ppdd.voided = 'false' AND ppdd.program_id = 1)
+SELECT 
+	DATE_TRUNC('Month', cc.date_enrolled) AS record_month_enrollment,
+	percentile_cont(0.5) WITHIN GROUP (ORDER BY cc.day_diff_injury_admission) 
+FROM cte_cohort cc
+GROUP BY DATE_TRUNC('Month', cc.date_enrolled)
