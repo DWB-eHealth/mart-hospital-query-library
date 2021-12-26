@@ -49,7 +49,7 @@ cte_cohort AS (
 		ON ppdd.patient_program_id = cima.patient_program_id
 	WHERE ppdd.voided = 'false' AND ppdd.program_id = 1 AND ppdd.date_completed IS NOT NULL)
 SELECT 
-	DATE_TRUNC('Month', cc.date_completed) AS record_month_completed,
-	percentile_cont(0.5) WITHIN GROUP (ORDER BY cc.los_days) 
+	DATE_TRUNC('Month', cc.date_completed) AS record_month,
+	percentile_cont(0.5) WITHIN GROUP (ORDER BY cc.los_days) AS alos
 FROM cte_cohort cc
 GROUP BY DATE_TRUNC('Month', cc.date_completed)
