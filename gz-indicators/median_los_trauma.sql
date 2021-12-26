@@ -5,12 +5,6 @@ WITH cte_first_consultation AS (
 		admission_status
 	FROM first_consultation fc
 	ORDER BY patient_program_id, date_created DESC),
-cte_initial_medical_assessment AS (
-	SELECT 
-		DISTINCT ON (patient_program_id) patient_program_id,
-		date_of_injury
-	FROM initial_medical_assessment
-	ORDER BY patient_program_id, date_created DESC),
 cte_cohort AS (
 	SELECT 
 		ppdd.patient_id,
@@ -36,17 +30,12 @@ cte_cohort AS (
 		ppdd.date_completed,
 		ppdd.program_outcome,
 		abs(ppdd.date_completed::date - ppdd.date_enrolled::date) AS los_days,
-		cfc.location_name,
-		cfc.admission_status,
-		cima.date_of_injury, 
-		abs(ppdd.date_enrolled::date - cima.date_of_injury::date) AS day_diff_injury_admission
+		cfc.location_name
 	FROM patient_program_data_default ppdd 
 	LEFT OUTER JOIN person_details_default pdd 
 		ON ppdd.patient_id = pdd.person_id
 	LEFT OUTER JOIN cte_first_consultation cfc 
 		ON ppdd.patient_program_id = cfc.patient_program_id
-	LEFT OUTER JOIN cte_initial_medical_assessment cima 
-		ON ppdd.patient_program_id = cima.patient_program_id
 	WHERE ppdd.voided = 'false' AND ppdd.program_id = 1 AND ppdd.date_completed IS NOT NULL)
 SELECT 
 	DATE_TRUNC('Month', cc.date_completed) AS record_month,
