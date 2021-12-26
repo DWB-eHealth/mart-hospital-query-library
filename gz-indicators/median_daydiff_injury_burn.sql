@@ -49,7 +49,7 @@ cte_cohort AS (
 		ON ppdd.patient_program_id = cima.patient_program_id
 	WHERE ppdd.voided = 'false' AND ppdd.program_id = 2)
 SELECT 
-	DATE_TRUNC('Month', cc.date_enrolled) AS record_month_enrollment,
+	DATE_TRUNC('Month', cc.date_enrolled) AS record_month,
 	percentile_cont(0.5) WITHIN GROUP (ORDER BY cc.day_diff_injury_admission) 
 FROM cte_cohort cc
 GROUP BY DATE_TRUNC('Month', cc.date_enrolled)
