@@ -52,4 +52,5 @@ SELECT
 	DATE_TRUNC('Month', cc.date_completed) AS record_month,
 	percentile_cont(0.5) WITHIN GROUP (ORDER BY cc.los_days) AS alos
 FROM cte_cohort cc
+WHERE cc.date_completed > date_trunc('month', CURRENT_DATE) - INTERVAL '1 year'
 GROUP BY DATE_TRUNC('Month', cc.date_completed)
