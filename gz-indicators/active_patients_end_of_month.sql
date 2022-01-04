@@ -98,9 +98,9 @@ daily_active_patients AS (
 	LEFT OUTER JOIN daily_exits_burn ON day_range.day = daily_exits_burn.day)
 SELECT 
 	dap.reporting_day,
-	dap.active_patients_trauma,
 	dap.active_patients_burn,
+	dap.active_patients_trauma,
 	sum(dap.active_patients_trauma+dap.active_patients_burn) AS active_patients_total
 FROM daily_active_patients dap
-WHERE dap.last_day_of_month = 1
+WHERE dap.last_day_of_month = 1 and dap.reporting_day > date_trunc('MONTH', CURRENT_DATE) - INTERVAL '1 year'
 GROUP BY dap.reporting_day, dap.active_patients_trauma, dap.active_patients_burn
