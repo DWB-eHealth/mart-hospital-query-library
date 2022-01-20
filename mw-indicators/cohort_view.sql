@@ -21,8 +21,8 @@ SELECT
 	pad2.address3 AS district,
 	ppdd.patient_program_id,
 	CASE
-		WHEN ppdd.program_id = 1 then 'Oncogynae Program'
-		WHEN ppdd.program_id = 2 THEN 'Palliative Program'
+		WHEN ppdd.program_id = 1 then 'Oncogynae'
+		WHEN ppdd.program_id = 2 THEN 'Palliative Care'
 		ELSE NULL
 	END AS program_name,
 	ppdd.date_enrolled,
