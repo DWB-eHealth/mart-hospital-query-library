@@ -1,13 +1,7 @@
 SELECT 
 	DISTINCT ON (ppdd.patient_id) ppdd.patient_id,
 	ppdd.age_during_enrollment,
-	CASE 
-		WHEN ppdd.age_during_enrollment::int <5 THEN '<5'
-		WHEN ppdd.age_during_enrollment::int >=5 AND ppdd.age_during_enrollment::int <15 THEN '5-15'
-		WHEN ppdd.age_during_enrollment::int >=15 AND ppdd.age_during_enrollment::int <45 THEN '15-45'
-		WHEN ppdd.age_during_enrollment::int >=45 THEN '>45'
-		ELSE NULL 
-	END AS age_group_during_enrollment,
+	age_group(ppdd.date_enrolled, TO_DATE(CONCAT('01-01-', pdd.birthyear), 'dd-MM-yyyy')) AS age_group_during_enrollment,
 	CASE 
 		WHEN pdd.gender = 'M' THEN 'Male'
 		WHEN pdd.gender = 'F' THEN 'Female'
