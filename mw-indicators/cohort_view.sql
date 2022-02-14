@@ -26,6 +26,8 @@ SELECT
 		ELSE NULL
 	END AS program_name,
 	ppdd.date_enrolled,
+	psd.state_name AS current_state,
+	psd.start_date AS state_start_date,
 	ph.referral_facility,
 	CASE 
 		WHEN ph.msf_via_centre_name IS NOT NULL THEN ph.msf_via_centre_name
@@ -67,10 +69,12 @@ LEFT OUTER JOIN person_details_default pdd
 	ON ppdd.patient_id = pdd.person_id 
 LEFT OUTER JOIN person_address_default pad2 
 	ON ppdd.patient_id = pad2.person_id 
+LEFT OUTER JOIN patient_state_default psd 
+	ON ppdd.patient_program_id = psd.patient_program_id 
 LEFT OUTER JOIN patient_history ph 
 	ON ppdd.patient_program_id = ph.patient_program_id
 LEFT OUTER JOIN cte_first_vs cfv 
 	ON ppdd.patient_program_id = cfv.patient_program_id
 LEFT OUTER JOIN cte_latest_vs clv
 	ON ppdd.patient_program_id = clv.patient_program_id
-WHERE ppdd.voided = 'false'
+WHERE ppdd.voided = 'false' AND psd.end_date IS NULL
