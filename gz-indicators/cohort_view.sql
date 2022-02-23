@@ -19,7 +19,7 @@ cte_initial_medical_assessment AS (
 		cause_of_injury,
 		cause_of_burn, 
 		location_of_first_treatment, 
-		ima_total_tbsa
+		total_tbsa
 	FROM initial_medical_assessment
 	ORDER BY patient_program_id, date_created DESC)
 SELECT 
@@ -39,6 +39,10 @@ SELECT
 	ppdd.date_enrolled,
 	ppdd.date_completed,
 	ppdd.program_outcome,
+	CASE
+		WHEN ppdd.program_outcome = 'Rejected' THEN 'Rejected'
+		ELSE null
+	END AS rejected,
 	abs(ppdd.date_completed::date - ppdd.date_enrolled::date) AS los_days,
 	cfc.location_name,
 	cfc.source_of_initial_patient_referral,
@@ -54,18 +58,18 @@ SELECT
 	cima.cause_of_injury, 
 	cima.cause_of_burn, 
 	cima.location_of_first_treatment, 
-	cima.ima_total_tbsa, 
+	cima.total_tbsa, 
 	CASE 
-		WHEN cima.ima_total_tbsa <10 THEN '0.1-9.9%'
-		WHEN cima.ima_total_tbsa >=10 AND cima.ima_total_tbsa <20 THEN '10-19.9%'
-		WHEN cima.ima_total_tbsa >=20 AND cima.ima_total_tbsa <30 THEN '20-29.9%'
-		WHEN cima.ima_total_tbsa >=30 AND cima.ima_total_tbsa <40 THEN '30-39.9%'
-		WHEN cima.ima_total_tbsa >=40 AND cima.ima_total_tbsa <50 THEN '40-49.9%'
-		WHEN cima.ima_total_tbsa >=50 AND cima.ima_total_tbsa <60 THEN '50-59.9%'
-		WHEN cima.ima_total_tbsa >=60 AND cima.ima_total_tbsa <70 THEN '60-69.9%'
-		WHEN cima.ima_total_tbsa >=70 AND cima.ima_total_tbsa <80 THEN '70-79.9%'
-		WHEN cima.ima_total_tbsa >=80 AND cima.ima_total_tbsa <90 THEN '80-89.9%'
-		WHEN cima.ima_total_tbsa >89.9 THEN '>=90%'
+		WHEN cima.total_tbsa <10 THEN '0.1-9.9%'
+		WHEN cima.total_tbsa >=10 AND cima.total_tbsa <20 THEN '10-19.9%'
+		WHEN cima.total_tbsa >=20 AND cima.total_tbsa <30 THEN '20-29.9%'
+		WHEN cima.total_tbsa >=30 AND cima.total_tbsa <40 THEN '30-39.9%'
+		WHEN cima.total_tbsa >=40 AND cima.total_tbsa <50 THEN '40-49.9%'
+		WHEN cima.total_tbsa >=50 AND cima.total_tbsa <60 THEN '50-59.9%'
+		WHEN cima.total_tbsa >=60 AND cima.total_tbsa <70 THEN '60-69.9%'
+		WHEN cima.total_tbsa >=70 AND cima.total_tbsa <80 THEN '70-79.9%'
+		WHEN cima.total_tbsa >=80 AND cima.total_tbsa <90 THEN '80-89.9%'
+		WHEN cima.total_tbsa >89.9 THEN '>=90%'
 		ELSE NULL 
 	END AS tbsa_categories
 FROM patient_program_data_default ppdd 
