@@ -8,9 +8,13 @@ WITH cte_next_appointment AS (
 	ORDER BY patient_id, appointment_service, appointment_start_time 
 )
 SELECT
+	pi."Patient_Identifier",
 	ppdd.patient_id,
 	ppdd.patient_program_id,
-	ppdd.program_id,
+	CASE 
+		WHEN ppdd.program_id = 1 THEN 'Trauma'
+		WHEN ppdd.program_id = 2 THEN 'Burn'
+	END AS program_name,
 	ppdd.date_enrolled,
 	CASE 
 		WHEN cna.appointment_service = 'Physiotherapy' THEN cna.appointment_start_time 
@@ -80,7 +84,9 @@ SELECT
 		WHEN cna.appointment_service = 'Session under sedation' THEN cna.appointment_start_time 
 		ELSE NULL
 	END AS next_under_sedation_appt
-FROM patient_program_data_default ppdd 
+FROM patient_program_data_default ppdd
+LEFT OUTER JOIN patient_identifier pi
+	ON ppdd.patient_id = pi.patient_id 
 LEFT OUTER JOIN cte_next_appointment cna 
 	ON ppdd.patient_id = cna.patient_id 
 WHERE ppdd.voided = 'false' AND ppdd.date_completed IS NULL
