@@ -3,9 +3,8 @@ WITH cte_next_appointment AS (
 		DISTINCT ON (patient_id, appointment_service) patient_id,
 		appointment_service, 
 		appointment_start_time 
-	FROM patient_appointment_default pad2 
-	WHERE appointment_start_time > current_date 
-	ORDER BY patient_id, appointment_service, appointment_start_time 
+	FROM patient_appointment_default
+	ORDER BY patient_id, appointment_service, appointment_start_time DESC 
 )
 SELECT
 	pi."Patient_Identifier",
