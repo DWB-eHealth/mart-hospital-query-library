@@ -38,7 +38,7 @@ SELECT
 	ponw.patient_id,
 	ponw.pre_op_start_date,
 	ponw.nwfu_date,
-	DATE_PART('day',ponw.nwfu_date::timestamp-ponw.pre_op_start_date::timestamp)
+	DATE_PART('day',ponw.nwfu_date::timestamp-ponw.pre_op_start_date::timestamp) AS  los_days
 FROM preop_nwfu_cte ponw
 WHERE ponw.nwfu_date IS NOT NULL 
 ORDER BY ponw.patient_id, ponw.pre_op_start_date, ponw.nwfu_date
