@@ -57,16 +57,16 @@ fuv_surgeon_cte AS (
 SELECT 
 	DISTINCT ON (ponw.patient_id, ponw.pre_op_start_date) 
 	ponw.patient_id,
-	ponw.pre_op_start_date,
-	ponw.nwfu_date,
-	DATE_PART('day',ponw.nwfu_date::timestamp-ponw.pre_op_start_date::timestamp) AS  los_days,
 	CASE
 		WHEN fuv.fup_name_s_of_surgeon_1 IS NOT NULL THEN fuv.fup_name_s_of_surgeon_1 
 		WHEN fuv.fup_name_s_of_surgeon_1 IS NULL AND fv.fv_name_s_of_surgeon_1 IS NOT NULL THEN fv.fv_name_s_of_surgeon_1 
 		WHEN fuv.fup_name_s_of_surgeon_1 IS NULL AND fv.fv_name_s_of_surgeon_1 IS NULL AND fsv.fstg_name_s_of_surgeon_1 IS NOT NULL THEN fsv.fstg_name_s_of_surgeon_1
 		ELSE NULL 
 	END AS name_of_surgeon,
-	pdd.gender 
+	pdd.gender,
+	ponw.pre_op_start_date,
+	ponw.nwfu_date,
+	DATE_PART('day',ponw.nwfu_date::timestamp-ponw.pre_op_start_date::timestamp) AS  los_days
 FROM preop_nwfu_cte ponw
 LEFT OUTER JOIN fsv_surgeon_cte fsv
 	ON ponw.patient_id = fsv.patient_id 
