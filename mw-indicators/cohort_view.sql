@@ -3,14 +3,14 @@ WITH cte_first_vs AS (
 		DISTINCT ON (vs.patient_program_id) vs.patient_program_id ,
 		vs.date_time_recorded::date AS first_vs_date,
 		vs.bmi
-	FROM vital_signs vs
+	FROM '2_vital_signs' vs
 	ORDER BY vs.patient_program_id, vs.date_time_recorded ASC),
 	cte_latest_vs AS (
 	SELECT
 		DISTINCT ON (vs.patient_program_id) vs.patient_program_id ,
 		vs.date_time_recorded::date AS first_vs_date,
 		vs.bmi
-	FROM vital_signs vs
+	FROM '2_vital_signs' vs
 	ORDER BY vs.patient_program_id, vs.date_time_recorded DESC)
 SELECT 
 	ppdd.patient_id,
@@ -71,7 +71,7 @@ LEFT OUTER JOIN person_address_default pad2
 	ON ppdd.patient_id = pad2.person_id 
 LEFT OUTER JOIN patient_state_default psd 
 	ON ppdd.patient_program_id = psd.patient_program_id 
-LEFT OUTER JOIN patient_history ph 
+LEFT OUTER JOIN '1_patient_history' ph 
 	ON ppdd.patient_program_id = ph.patient_program_id
 LEFT OUTER JOIN cte_first_vs cfv 
 	ON ppdd.patient_program_id = cfv.patient_program_id
