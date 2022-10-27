@@ -155,7 +155,11 @@
       "conceptReferenceSource": "",
       "ignoreAllFreeTextConcepts": true,
       "includeFreeTextConceptNames": [
-        "Treating Surgeon"
+		"Treating Surgeon",
+		"IPN, Summary of consultation",
+		"PA, Additional comments",
+		"NN, Nursing consultation notes",
+		"General comments from admission committee"
       ],
       "columnsToIgnore": [
         "Image"
