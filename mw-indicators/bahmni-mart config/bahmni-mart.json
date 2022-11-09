@@ -167,19 +167,19 @@
       "conceptReferenceSource": "",
       "ignoreAllFreeTextConcepts": true,
       "includeFreeTextConceptNames": [
-        "PH, NGO's VIA centre name, other",
+		"PH, NGO's VIA centre name, other",
 		"PH, MOH health facility name, Other",
-        "CS, Reason for presentation",
-        "IC, Abnormal findings, other",
+		"CS, Reason for presentation",
+		"IC, Abnormal findings, other",
 		"IC, Precancerous lesions, other",
 		"IC, Confirmed malignancy diagnosis, other",
-        "IC, Topography of tumour (confirmed), other female genital organs",
-        "SC, Abnormal findings, other",
+		"IC, Topography of tumour (confirmed), other female genital organs",
+		"SC, Abnormal findings, other",
 		"SC, Precancerous lesions, other",
 		"SC, Confirmed malignancy diagnosis, other",
 		"SC, Topography of tumour (confirmed), other female genital organs",
 		"SC, Treatment phase, other",
-		"PTMDT, Abnormal findings, other",
+		"PTMDT, Abnormal findings, other"
 		"PTMDT, Precancerous lesions, other"
       ],
       "columnsToIgnore": [
