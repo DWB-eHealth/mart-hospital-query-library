@@ -30,7 +30,7 @@ last_treatment_phase AS (
 	SELECT
 		DISTINCT ON (patient_program_id) patient_program_id,
 		treatment_phase, 
-		/*treatment_phase_other,*/
+		treatment_phase_other,
 		date_recorded
 	FROM "7_subsequent_consultation" 
 	WHERE treatment_phase IS NOT NULL
@@ -60,9 +60,9 @@ last_abnormal_findings AS (
 		cd.obs_datetime,
 		CASE 
 			WHEN ic.abnormal_findings IS NOT NULL AND ic.abnormal_findings != 'Other' THEN ic.abnormal_findings
-			/*WHEN ic.abnormal_findings IS NOT NULL AND ic.abnormal_findings = 'Other' THEN ic.abnormal_findings_other*/
+			WHEN ic.abnormal_findings IS NOT NULL AND ic.abnormal_findings = 'Other' THEN ic.abnormal_findings_other
 			WHEN sc.abnormal_findings IS NOT NULL AND sc.abnormal_findings != 'Other' THEN sc.abnormal_findings
-			/*WHEN sc.abnormal_findings IS NOT NULL AND sc.abnormal_findings = 'Other' THEN sc.abnormal_findings_other*/
+			WHEN sc.abnormal_findings IS NOT NULL AND sc.abnormal_findings = 'Other' THEN sc.abnormal_findings_other
 			WHEN af.abnormal_findings::text IS NOT NULL THEN af.abnormal_findings::text
 			ELSE 'Not recorded'
 		END abnormal_findings,
@@ -158,12 +158,12 @@ last_confirmed_malignancy AS (
 			WHEN cd.reference_form_field_path = '10 Pre Treatment MDT' THEN ptm.agreed_figo_staging_for_cancer_of_the_ovary 
 			ELSE NULL
 		END AS confirmed_malignancy_ovary_figo,
-		/*CASE 
+		CASE 
 			WHEN cd.reference_form_field_path = '05 Initial Consultation' THEN iccmd.topography_of_tumour_confirmed_other_female_genital_organs 
 			WHEN cd.reference_form_field_path = '07 Subsequent Consultation' THEN sccmd.topography_of_tumour_confirmed_other_female_genital_organs 
 			WHEN cd.reference_form_field_path = '10 Pre Treatment MDT' THEN 'Confirm malignancy of other female genital organs'
 			ELSE NULL
-		END AS confirmed_malignancy_other_organ,*/
+		END AS confirmed_malignancy_other_organ,
 		CASE 
 			WHEN cd.reference_form_field_path = '05 Initial Consultation' THEN ic.date_recorded
 			WHEN cd.reference_form_field_path = '07 Subsequent Consultation' THEN sc.date_recorded
@@ -193,13 +193,13 @@ SELECT
 	CASE 
 		WHEN ph.referral_facility = 'MSF VIA centre' AND ph.msf_via_centre_name IS NOT NULL THEN ph.msf_via_centre_name 
 		WHEN ph.referral_facility = 'MSF VIA centre' AND ph.msf_via_centre_name IS NULL THEN 'MSF VIA centre name not recorded'
-		WHEN ph.referral_facility = 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name IS NOT NULL AND ph.ngo_s_via_centre_name != 'Other' THEN ph.ngo_s_via_centre_name 
-		WHEN ph.referral_facility = 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name = 'Other' AND ph.ngo_s_via_centre_name_other IS NOT NULL THEN ph.ngo_s_via_centre_name_other
-		WHEN ph.referral_facility = 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name = 'Other' AND ph.ngo_s_via_centre_name_other IS NULL THEN 'Other NGO VIA centre'
-		WHEN ph.referral_facility = 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name IS NULL THEN 'NGO VIA centre not recorded'
+		WHEN ph.referral_facility LIKE 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name IS NOT NULL AND ph.ngo_s_via_centre_name != 'Other' THEN ph.ngo_s_via_centre_name 
+		WHEN ph.referral_facility LIKE 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name = 'Other' AND ph.ngo_s_via_centre_name_other IS NOT NULL THEN ph.ngo_s_via_centre_name_other
+		WHEN ph.referral_facility LIKE 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name = 'Other' AND ph.ngo_s_via_centre_name_other IS NULL THEN 'Other NGO VIA centre'
+		WHEN ph.referral_facility LIKE 'NGO%s VIA centre' AND ph.ngo_s_via_centre_name IS NULL THEN 'NGO VIA centre not recorded'
 		WHEN ph.referral_facility = 'Other health facility' AND ph.moh_health_facility_name IS NOT NULL AND ph.moh_health_facility_name != 'Other' THEN ph.moh_health_facility_name 
-		/*WHEN ph.referral_facility = 'Other health facility' AND ph.moh_health_facility_name = 'Other' AND ph.moh_health_facility_name is not null THEN ph.moh_health_facility_name_other
-		WHEN ph.referral_facility = 'Other health facility' AND ph.moh_health_facility_name = 'Other' AND ph.moh_health_facility_name_other IS NULL THEN 'Other MOH VIA centre'*/
+		WHEN ph.referral_facility = 'Other health facility' AND ph.moh_health_facility_name = 'Other' AND ph.moh_health_facility_name_other IS NOT NULL THEN ph.moh_health_facility_name_other
+		WHEN ph.referral_facility = 'Other health facility' AND ph.moh_health_facility_name = 'Other' AND ph.moh_health_facility_name_other IS NULL THEN 'Other MOH VIA centre'
 		WHEN ph.referral_facility = 'Other health facility' AND ph.moh_health_facility_name IS NULL THEN 'MOH VIA centre name not recorded'
 		ELSE null
 	END AS referral_facility_name,
@@ -224,7 +224,7 @@ SELECT
 	END AS seen_last_month,
 	CASE 
 		WHEN ltp.treatment_phase IS NOT NULL AND ltp.treatment_phase != 'Other' THEN ltp.treatment_phase
-		/*WHEN ltp.treatment_phase IS NOT NULL AND ltp.treatment_phase = 'Other' THEN ltp.treatment_phase_other*/
+		WHEN ltp.treatment_phase IS NOT NULL AND ltp.treatment_phase = 'Other' THEN ltp.treatment_phase_other
 		ELSE 'Not recorded'
 	END AS treatment_phase,
 	CASE 
@@ -246,8 +246,8 @@ SELECT
 	lcm.confirmed_malignancy_vagina_figo,
 	lcm.confirmed_malignancy_cervix_uteri_figo,
 	lcm.confirmed_malignancy_corpus_uteri_figo,
-	lcm.confirmed_malignancy_ovary_figo/*,
-	lcm.confirmed_malignancy_other_organ*/
+	lcm.confirmed_malignancy_ovary_figo,
+	lcm.confirmed_malignancy_other_organ
 FROM patient_program_data_default ppdd 
 LEFT OUTER JOIN patient_identifier pi
 	ON ppdd.patient_id = pi.patient_id
