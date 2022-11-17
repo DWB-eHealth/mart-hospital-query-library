@@ -230,7 +230,7 @@
     },
     {
       "name": "patient_information_view",
-      "sql": "SELECT pd.person_id AS patient_id, pd.gender, pd.birthyear, pd.birthtime, pd.birthdate_estimated, pd.death_date, pd.deathdate_estimated, pd.cause_of_death, pad.address1, pad.address2, pad.address3, pad.start_date, pad.end_date, pa.* FROM person_details_default pd LEFT JOIN person_attributes pa ON pa.person_id = pd.person_id LEFT JOIN person_address_default pad ON pad.person_id = pd.person_id and pad.preferred = 'true'"
+      "sql": "SELECT pd.person_id AS patient_id, pd.gender, pd.birthyear, pd.birthtime, pd.birthdate_estimated, pd.death_date, pd.deathdate_estimated, pd.cause_of_death, pad.address1, pad.address2, pad.address3, pad.address4, pad.start_date, pad.end_date, pa.* FROM person_details_default pd LEFT JOIN person_attributes pa ON pa.person_id = pd.person_id LEFT JOIN person_address_default pad ON pad.person_id = pd.person_id and pad.preferred = 'true'"
     },
     {
       "name": "bed_management_view",
