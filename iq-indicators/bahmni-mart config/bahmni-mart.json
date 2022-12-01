@@ -159,7 +159,8 @@
 		"IPN, Summary of consultation",
 		"PA, Additional comments",
 		"NN, Nursing consultation notes",
-		"General comments from admission committee"
+		"General comments from admission committee",
+		"History of present illness (context)"
       ],
       "columnsToIgnore": [
         "Image"
