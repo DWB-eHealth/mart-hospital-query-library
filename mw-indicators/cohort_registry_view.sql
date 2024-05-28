@@ -145,7 +145,6 @@ social_assessment_edu AS (
 		patient_education_level
 	FROM "15_social_assessment"
 	WHERE patient_education_level IS NOT NULL),
--- NEED TO FINISH BLOCK TO CREATE CTE FOR FIRST MH CONSULTATION DATE AFTER DISCLOSURE
 social_assessment_post_disclosure AS (
 	SELECT
 		sa.patient_id,
@@ -161,7 +160,7 @@ last_visit AS (
 		patient_id,
 		date_recorded AS last_visit_date,
 		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_recorded DESC) AS row
-	FROM (SELECT patient_id, date_recorded FROM "07_subsequent_consultation" UNION SELECT patient_id, date_recorded FROM "12_supportive_care_assessment" UNION SELECT patient_id, appointment_start_time::date AS date_recorded FROM patient_appointment_default WHERE appointment_status = 'Completed' OR appointment_status = 'CheckedIn') foo),
+	FROM (SELECT patient_id, date_recorded FROM "07_subsequent_consultation" UNION SELECT patient_id, date_recorded FROM "12_supportive_care_assessment" UNION SELECT patient_id, appointment_start_time::date AS date_recorded FROM patient_appointment_default WHERE (appointment_status = 'Completed' OR appointment_status = 'CheckedIn') AND appointment_service IN ('Initial gynaecology consultation','Subsequent gynaecology consultation','Palliative Care','Subsequent disclosure visit')) foo),
 program AS (
 	SELECT 
 		ppdd.patient_id, 
