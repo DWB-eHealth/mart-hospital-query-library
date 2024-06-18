@@ -121,6 +121,15 @@ patient_history AS (
 		hpv_status,
 		smoker
 	FROM "01_patient_history"),
+vital_signs AS (
+	SELECT
+		patient_id,
+		encounter_id,
+		patient_program_id,
+		date_time_recorded AS date_last_vitals,
+		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_time_recorded DESC) AS row,
+		bmi
+	FROM "02_vital_signs"),
 hiv_test AS (
 		SELECT patient_id, encounter_id, patient_program_id, date_recorded, result_of_hiv_test AS hiv_test, on_antiretroviral_therapy, last_cd4_count AS cd4_count FROM "01_patient_history" WHERE result_of_hiv_test IS NOT NULL UNION
 		SELECT patient_id, encounter_id, patient_program_id, date_recorded, hiv_test, null AS on_antiretroviral_therapy, cd4_count FROM "03_laboratory" WHERE hiv_test IS NOT NULL),
@@ -151,7 +160,7 @@ social_assessment_post_disclosure AS (
 		sa.encounter_id,
 		sa.patient_program_id,
 		sa.date_recorded AS mh_assesssment_date,
-		ROW_NUMBER() OVER (PARTITION BY sa.patient_id ORDER BY sa.date_recorded ASC) AS row
+		ROW_NUMBER() OVER (PARTITION BY sa.patient_id ORDER BY sa.date_recorded) AS row
 	FROM "15_social_assessment" sa
 	LEFT JOIN subsequent_consultation_disclosure scd ON sa.patient_id = scd.patient_id AND sa.date_recorded::date >= scd.disclosure_date::date
 	WHERE scd.row = 1),
@@ -160,8 +169,103 @@ last_visit AS (
 		patient_id,
 		date_recorded AS last_visit_date,
 		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_recorded DESC) AS row
-	FROM (SELECT patient_id, date_recorded FROM "07_subsequent_consultation" UNION SELECT patient_id, date_recorded FROM "12_supportive_care_assessment" UNION SELECT patient_id, appointment_start_time::date AS date_recorded FROM patient_appointment_default WHERE (appointment_status = 'Completed' OR appointment_status = 'CheckedIn') AND appointment_service IN ('Initial gynaecology consultation','Subsequent gynaecology consultation','Palliative Care','Subsequent disclosure visit')) foo),
-program AS (
+	FROM (SELECT patient_id, date_recorded FROM "05_initial_consultation" UNION SELECT patient_id, date_recorded FROM "07_subsequent_consultation" UNION SELECT patient_id, date_recorded FROM "10_pre_treatment_mdt" UNION SELECT patient_id, date_recorded FROM "11_follow_up_mdt" UNION 	SELECT patient_id, date_recorded FROM "12_supportive_care_assessment" UNION SELECT patient_id, appointment_start_time::date AS date_recorded FROM patient_appointment_default WHERE (appointment_status = 'Completed' OR appointment_status = 'CheckedIn') AND appointment_service IN ('Initial gynaecology consultation','Subsequent gynaecology consultation','Palliative Care','Subsequent disclosure visit')) foo),
+last_appt_missed AS (
+	SELECT patient_id, appointment_start_time::date, appointment_status
+	FROM (SELECT patient_id, appointment_start_time, appointment_status, ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY appointment_start_time DESC) as row
+		FROM patient_appointment_default
+		WHERE appointment_start_time::date < CURRENT_DATE) foo
+	WHERE row = 1 AND appointment_status = 'Missed'),
+last_appt_missed_clean AS (
+	SELECT 
+		patient_id, appointment_start_time, appointment_status
+	FROM last_appt_missed lam
+	WHERE NOT EXISTS (
+    SELECT 1
+    FROM (SELECT patient_id, date_recorded FROM "05_initial_consultation" UNION SELECT patient_id, date_recorded FROM "07_subsequent_consultation" UNION SELECT patient_id, date_recorded FROM "10_pre_treatment_mdt" UNION SELECT patient_id, date_recorded FROM "11_follow_up_mdt" UNION 	SELECT patient_id, date_recorded FROM "12_supportive_care_assessment") foo
+    WHERE foo.patient_id = lam.patient_id AND foo.date_recorded > lam.appointment_start_time)),
+next_appointment AS (
+	SELECT
+		patient_id, appointment_start_time,
+		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY appointment_start_time) AS row
+	FROM patient_appointment_default
+	WHERE appointment_status = 'Scheduled' AND appointment_start_time > CURRENT_DATE),
+first_surgery AS (
+	SELECT patient_id, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_of_surgery) AS ROW
+	FROM (SELECT patient_id, date_of_surgery FROM "19_cervical_surgical_report" UNION SELECT patient_id, date_of_surgery FROM "20_ovary_surgical_report" UNION SELECT patient_id, date_of_surgery FROM "21_vulva_surgical_report" UNION SELECT patient_id, date_recorded AS date_of_surgery FROM "09_leep_and_conization" WHERE conization_indication IS NOT NULL) foo),
+leep_binary AS (
+	SELECT patient_id, 'Yes' AS leep, date_recorded, ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_recorded) AS ROW
+	FROM "09_leep_and_conization" 
+	WHERE leep_indication IS NOT NULL),
+radical_abdominal_hysterectomy AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS radical_abdominal_hysterectomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed = 'Radical abdominal hysterectomy'),
+total_abdominal_hysterectomy AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS total_abdominal_hysterectomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed = 'Total abdominal hysterectomy'),
+radical_vaginal_hysterectomy AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS radical_vaginal_hysterectomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed = 'Radical vaginal hysterectomy'),
+total_vaginal_hysterectomy AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS total_vaginal_hysterectomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed = 'Total vaginal hysterectomy'),
+exploratory_laparotomy AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS exploratory_laparotomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed = 'Exploratory laparotomy'),
+other_cervical_surgical_procedures AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS other_cervical_surgical_procedures, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed IN ('Bilateral salpingectomy', 'Radical trachelectomy', 'Pelvic lymphadenectomy', 'Lomboaortic lymphadenectomy', 'Left oophorectomy', 'Right oophorectomy', 'Bilateral oophorectomy', 'Lateral parametrium excision', 'Ventral parametrium excision', 'Dorsal parametrium excision', 'Wound Debridement', 'Delayed suture of wound', 'Peritoneal washing', 'Pelvic examination under anesthesia', 'Dilation and curettage', 'Drainage of abscess', 'Cauterization of wart', 'Left salpingectomy', 'Right salpingectomy', 'Total colpectomy', 'Partial colpectomy', 'Other')),
+ovary_surgical_report AS (
+	SELECT
+    	patient_id, 'Yes' AS ovary_surgical_report, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_of_surgery) AS ROW
+	FROM "20_ovary_surgical_report"),
+vulva_surgical_report AS (
+	SELECT
+    	patient_id, 'Yes' AS vulva_surgical_report, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_of_surgery) AS ROW
+	FROM "21_vulva_surgical_report"),
+biopsy_taken AS (
+	SELECT patient_id, 'Yes' AS biopsy, date_recorded, ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_recorded) AS ROW
+	FROM (
+		SELECT ppge.patient_id, ic.date_recorded, 'Yes' AS biopsy 
+		FROM procedure_performed_gynaecological_exam ppge
+		LEFT JOIN "05_initial_consultation" ic USING(encounter_id)
+		WHERE procedure_performed_gynaecological_exam IN ('Biopsy of cervix', 'Biopsy')
+		UNION
+		SELECT ppge.patient_id, sc.date_recorded, 'Yes' AS biopsy 
+		FROM procedure_performed_gynaecological_exam ppge
+		LEFT JOIN "07_subsequent_consultation" sc USING(encounter_id)
+		WHERE procedure_performed_gynaecological_exam IN ('Biopsy of cervix', 'Biopsy')
+		UNION
+		SELECT patient_id, date_recorded, 'Yes' AS biopsy
+		FROM "08_colposcopy"
+		WHERE biopsies_number_of_specimen_s_collected IS NOT NULL OR biopsies_number_of_specimen_s_collected > 0) foo),
+program_open AS (
+	SELECT 
+		patient_id,
+		CASE WHEN program_id = 1 THEN 'Oncogynae' WHEN program_id = 2 THEN 'Palliative Care' ELSE NULL END AS program_name,
+		date_enrolled::date, 
+		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY patient_program_id) AS row 
+	FROM patient_program_data_default 
+	WHERE voided = 'false' AND date_completed IS NULL),
+program_exit AS (
 	SELECT 
 		ppdd.patient_id, 
 		CASE WHEN ppdd.program_id = 1 THEN 'Oncogynae' WHEN ppdd.program_id = 2 THEN 'Palliative Care' ELSE NULL END AS program_name,
@@ -178,8 +282,13 @@ SELECT
 	ptid."Patient_Identifier",
 	ptid.patient_id,
 	pdd.age AS age_at_enrollment,
-	--add custom age groups <18; 18-24; 25-49; and >49 years
-	pdd.age_group AS age_group_at_enrollment,
+	CASE 
+		WHEN pdd.age::int < 18 THEN '0-17'
+		WHEN pdd.age::int >= 18 AND pdd.age::int <= 24 THEN '18-24'
+		WHEN pdd.age::int >= 25 AND pdd.age::int <= 49 THEN '25-49'
+		WHEN pdd.age::int >= 50 THEN '50+'
+		ELSE NULL
+	END AS age_group_at_enrollment,
 	LOWER(pad.address4) AS ta_town,
 	LOWER(pad.address3) AS district, 
 	LOWER(pad.address2) AS region, 
@@ -194,6 +303,7 @@ SELECT
 	ph.pregnancies,
 	hpv_status,
 	ph.smoker,
+	vs.bmi,
 	hr.hiv_test,
 	hr.on_antiretroviral_therapy,
 	hr.cd4_count,
@@ -209,17 +319,15 @@ SELECT
 	ptmdt.premdt_date,
 	ptmdt.premdt_confirmed_malignancy,
 	ptmdt.premdt_confirmed_malignancy_topo,
+	ptmdt.premdt_agreed_figo,
 	ptmdt.premdt_precancerous_lesions, 
 	ptmdt.premdt_abnormal_findings,
-	ptmdt.premdt_agreed_figo,
 	ptmdt.premdt_conservative_surgery,
 	ptmdt.premdt_surgical_procedure,
 	ptmdt.premdt_radiation_therapy,
 	ptmdt.premdt_chemotherapy,
 	ptmdt.premdt_palliative_care,
 	ptmdt.premdt_other_mgmt_plan,
-	scd.disclosure_date AS first_disclosure_date,
-	sapd.mh_assesssment_date AS first_mh_assessment_date,
 	fumdt.fumdt_date,
 	fumdt.fumdt_chemotherapy_response,
 	fumdt.fumdt_conservative_surgery,
@@ -228,31 +336,62 @@ SELECT
 	fumdt.fumdt_chemotherapy,
 	fumdt.fumdt_palliative_care,
 	fumdt.fumdt_other_mgmt_plan,
-	CASE WHEN p.patient_outcome != 'Death' OR p.patient_outcome IS NULL THEN scs.sub_consultation_date ELSE NULL END AS last_sub_consul_with_status,
-	CASE WHEN p.patient_outcome != 'Death' OR p.patient_outcome IS NULL THEN scs.sub_consultation_cancer_status ELSE NULL END AS last_cancer_status,
+	scd.disclosure_date AS first_disclosure_date,
+	sapd.mh_assesssment_date AS first_mh_assessment_date,
+	CASE WHEN pe.patient_outcome != 'Death' OR pe.patient_outcome IS NULL THEN scs.sub_consultation_date ELSE NULL END AS date_cancer_status,
+	CASE WHEN pe.patient_outcome != 'Death' OR pe.patient_outcome IS NULL THEN scs.sub_consultation_cancer_status ELSE NULL END AS last_cancer_status,
 	lv.last_visit_date,
-	CASE WHEN p.date_completed IS NULL THEN AGE(CURRENT_DATE, lv.last_visit_date::date) ELSE NULL END AS time_since_last_visit,
-	CASE WHEN p.date_completed IS NULL THEN (DATE_PART('year', AGE(CURRENT_DATE, lv.last_visit_date::date)))*12+DATE_PART('Month', AGE(CURRENT_DATE, lv.last_visit_date::date)) ELSE NULL END AS months_since_last_visit,
-	CASE WHEN p.date_completed IS NULL THEN (CURRENT_DATE-lv.last_visit_date::date) ELSE NULL END AS days_since_last_visit,
-	p.patient_outcome,
-	p.date_completed,
-	p.date_of_death,
-	AGE(p.date_completed, rd.date_created::date) AS length_of_follow,
-	(DATE_PART('year', AGE(p.date_completed, rd.date_created::date)))*12+DATE_PART('Month', AGE(p.date_completed, rd.date_created::date)) AS months_of_follow,
-	DATE_PART('year', AGE(p.date_completed, rd.date_created::date)) AS years_of_follow
-FROM pre_treatment_mdt ptmdt
-JOIN patient_identifier ptid ON ptmdt.patient_id = ptid.patient_id
-JOIN registration_date rd ON ptmdt.patient_id = rd.patient_id
-JOIN person_details_default pdd ON ptmdt.patient_id = pdd.person_id
+	CASE WHEN pe.date_completed IS NULL THEN AGE(CURRENT_DATE, lv.last_visit_date::date) ELSE NULL END AS time_since_last_visit,
+	CASE WHEN pe.date_completed IS NULL THEN (CURRENT_DATE-lv.last_visit_date::date) ELSE NULL END AS days_since_last_visit,
+	CASE WHEN pe.date_completed IS NULL THEN (DATE_PART('year', AGE(CURRENT_DATE, lv.last_visit_date::date)))*12+DATE_PART('Month', AGE(CURRENT_DATE, lv.last_visit_date::date)) ELSE NULL END AS months_since_last_visit,
+	CASE WHEN pe.date_completed IS NULL AND lam.appointment_start_time::date <> lv.last_visit_date THEN lam.appointment_start_time ELSE NULL END AS lost_to_follow_up,
+	CASE WHEN pe.date_completed IS NULL THEN na.appointment_start_time ELSE NULL END AS next_scheduled_appointment,
+	fs.date_of_surgery AS first_surgery_date,
+	rah.radical_abdominal_hysterectomy,
+	tah.total_abdominal_hysterectomy,
+	rvh.radical_vaginal_hysterectomy,
+	tvh.total_vaginal_hysterectomy,
+	el.exploratory_laparotomy,
+	op.other_cervical_surgical_procedures,
+	osr.ovary_surgical_report,
+	vsr.vulva_surgical_report,
+	lb.leep,
+	bt.biopsy,
+	CASE WHEN pe.program_name IS NOT NULL THEN pe.program_name WHEN po.program_name IS NOT NULL THEN po.program_name ELSE NULL END AS program_name,
+	pe.patient_outcome,
+	pe.date_completed,
+	pe.date_of_death,
+	AGE(pe.date_completed, rd.date_created::date) AS length_of_follow,
+	(DATE_PART('year', AGE(pe.date_completed, rd.date_created::date)))*12+DATE_PART('Month', AGE(pe.date_completed, rd.date_created::date)) AS months_of_follow,
+	DATE_PART('year', AGE(pe.date_completed, rd.date_created::date)) AS years_of_follow
+FROM patient_identifier ptid
+JOIN pre_treatment_mdt ptmdt ON ptid.patient_id = ptmdt.patient_id
+JOIN registration_date rd ON ptid.patient_id = rd.patient_id
+JOIN person_details_default pdd ON ptid.patient_id = pdd.person_id
 JOIN person_address_default pad ON ptid.patient_id = pad.person_id
-LEFT JOIN initial_consultation ic ON ptmdt.patient_id = ic.patient_id 
-LEFT JOIN follow_up_mdt fumdt ON ptmdt.patient_id = fumdt.patient_id 
-LEFT JOIN subsequent_consultation_status scs ON ptmdt.patient_id = scs.patient_id 
-LEFT JOIN subsequent_consultation_disclosure scd ON ptmdt.patient_id = scd.patient_id
-LEFT JOIN patient_history ph ON ptmdt.patient_id = ph.patient_id 
-LEFT JOIN hiv_result hr ON ptmdt.patient_id = hr.patient_id 
-LEFT JOIN social_assessment_edu sae ON ptmdt.patient_id = sae.patient_id 
-LEFT JOIN social_assessment_post_disclosure sapd ON ptmdt.patient_id = sapd.patient_id
-LEFT JOIN last_visit lv ON ptmdt.patient_id = lv.patient_id
-LEFT JOIN program p ON ptmdt.patient_id = p.patient_id 
-WHERE ptmdt.row = 1 AND (ic.row = 1 OR ic.row IS NULL) AND (fumdt.row = 1 OR fumdt.row IS NULL) AND (scs.row = 1 OR scs.row IS NULL) AND (ph.row = 1 OR ph.row IS NULL) AND (hr.row = 1 OR hr.row IS NULL) AND (sae.row = 1 OR sae.row IS NULL) AND (p.row = 1 OR p.row IS NULL) AND (lv.row = 1 OR lv.row IS NULL) AND (scd.row = 1 OR scd.row IS NULL) AND (sapd.row = 1 OR sapd.row IS NULL);
+LEFT JOIN initial_consultation ic ON ptid.patient_id = ic.patient_id 
+LEFT JOIN follow_up_mdt fumdt ON ptid.patient_id = fumdt.patient_id 
+LEFT JOIN subsequent_consultation_status scs ON ptid.patient_id = scs.patient_id 
+LEFT JOIN subsequent_consultation_disclosure scd ON ptid.patient_id = scd.patient_id
+LEFT JOIN patient_history ph ON ptid.patient_id = ph.patient_id 
+LEFT JOIN vital_signs vs ON ptid.patient_id = vs.patient_id
+LEFT JOIN hiv_result hr ON ptid.patient_id = hr.patient_id 
+LEFT JOIN social_assessment_edu sae ON ptid.patient_id = sae.patient_id 
+LEFT JOIN social_assessment_post_disclosure sapd ON ptid.patient_id = sapd.patient_id
+LEFT JOIN last_visit lv ON ptid.patient_id = lv.patient_id
+LEFT JOIN last_appt_missed_clean lam ON ptid.patient_id = lam.patient_id
+LEFT JOIN next_appointment na ON ptid.patient_id = na.patient_id
+LEFT JOIN first_surgery fs ON ptid.patient_id = fs.patient_id
+LEFT JOIN leep_binary lb ON ptid.patient_id = lb.patient_id
+LEFT JOIN radical_abdominal_hysterectomy rah ON ptid.patient_id = rah.patient_id
+LEFT JOIN total_abdominal_hysterectomy tah ON ptid.patient_id = tah.patient_id
+LEFT JOIN radical_vaginal_hysterectomy rvh ON ptid.patient_id = rvh.patient_id
+LEFT JOIN total_vaginal_hysterectomy tvh ON ptid.patient_id = tvh.patient_id
+LEFT JOIN exploratory_laparotomy el ON ptid.patient_id = el.patient_id
+LEFT JOIN other_cervical_surgical_procedures op ON ptid.patient_id = op.patient_id
+LEFT JOIN ovary_surgical_report osr ON ptid.patient_id = osr.patient_id
+LEFT JOIN vulva_surgical_report vsr ON ptid.patient_id = vsr.patient_id
+LEFT JOIN biopsy_taken bt ON ptid.patient_id = bt.patient_id
+LEFT JOIN program_open po ON ptid.patient_id = po.patient_id
+LEFT JOIN program_exit pe ON ptid.patient_id = pe.patient_id 
+WHERE (ptmdt.row = 1 OR ptmdt.row IS NULL) AND (ic.row = 1 OR ic.row IS NULL) AND (fumdt.row = 1 OR fumdt.row IS NULL) AND (scs.row = 1 OR scs.row IS NULL) AND (ph.row = 1 OR ph.row IS NULL) AND (vs.row = 1 OR vs.row IS NULL) AND (hr.row = 1 OR hr.row IS NULL) AND (sae.row = 1 OR sae.row IS NULL) AND (pe.row = 1 OR pe.row IS NULL) AND (lv.row = 1 OR lv.row IS NULL) AND (scd.row = 1 OR scd.row IS NULL) AND (sapd.row = 1 OR sapd.row IS NULL) AND (na.row = 1 OR na.row IS NULL) AND (fs.row = 1 OR fs.row IS NULL) AND (lb.row = 1 OR lb.row IS NULL) AND (rah.row = 1 OR rah.row IS NULL ) AND (tah.row = 1 OR tah.row IS NULL) AND (rvh.row = 1 OR rvh.row IS NULL) AND (tvh.row = 1 OR tvh.row IS NULL) AND (el.row = 1 OR el.row IS NULL) AND (op.row = 1 OR op.row IS NULL) AND (osr.row = 1 OR osr.row IS NULL) AND (vsr.row = 1 OR vsr.row IS NULL) AND (bt.row = 1 OR bt.row IS NULL)AND (po.row = 1 OR po.row IS NULL);
