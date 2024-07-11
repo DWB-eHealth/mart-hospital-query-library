@@ -43,24 +43,25 @@ initial_consultation AS (
 		ic.date_recorded AS initial_consultation_date,
 		ROW_NUMBER() OVER (PARTITION BY ic.patient_id ORDER BY ic.date_recorded) AS row,
 		ic.ecog_performance_status AS initial_ecog_performance_status,
-		CASE WHEN cdcm.clinical_diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_confirmed_malignancy,
-		CASE WHEN cdcm.clinical_diagnosis IS NOT NULL AND iccmd.topography_of_the_tumour_confirmed IS NOT NULL THEN 'Cervix' WHEN cdcm.clinical_diagnosis IS NOT NULL AND iccmd.topography_of_the_tumour_confirmed IS NULL THEN 'Other topograpy' ELSE NULL END AS initial_confirmed_malignancy_topo,
-		CASE WHEN cdsm.clinical_diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_suspected_malignancy,
-		CASE WHEN cdsm.clinical_diagnosis IS NOT NULL AND icsmd.topography_of_the_tumour_suspected IS NOT NULL THEN 'Cervix' WHEN cdsm.clinical_diagnosis IS NOT NULL AND icsmd.topography_of_the_tumour_suspected IS NULL THEN 'Other topograpy' ELSE NULL END AS initial_suspected_malignancy_topo,  
-		CASE WHEN cdpl.clinical_diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_precancerous_lesions,
-		CASE WHEN cdaf.clinical_diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_abnormal_findings
+		CASE WHEN cdcm.diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_confirmed_malignancy,
+		CASE WHEN cdcm.diagnosis IS NOT NULL AND iccmd.topography_of_the_tumour_confirmed IS NOT NULL THEN 'Cervix' WHEN cdcm.diagnosis IS NOT NULL AND iccmd.topography_of_the_tumour_confirmed IS NULL THEN 'Other topograpy' ELSE NULL END AS initial_confirmed_malignancy_topo,
+		CASE WHEN cdsm.diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_suspected_malignancy,
+		CASE WHEN cdsm.diagnosis IS NOT NULL AND icsmd.topography_of_the_tumour_suspected IS NOT NULL THEN 'Cervix' WHEN cdsm.diagnosis IS NOT NULL AND icsmd.topography_of_the_tumour_suspected IS NULL THEN 'Other topograpy' ELSE NULL END AS initial_suspected_malignancy_topo,  
+		CASE WHEN cdpl.diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_precancerous_lesions,
+		CASE WHEN cdaf.diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_abnormal_findings
 	FROM "05_initial_consultation" ic 
-	LEFT JOIN (SELECT * FROM clinical_diagnosis WHERE clinical_diagnosis = 'Confirmed malignancy') cdcm
+-- UPDATE HERE TO INCLUDE NEW DIAGANOSIS TABLES
+	LEFT JOIN (SELECT patient_id, encounter_id, clinical_diagnosis AS diagnosis, reference_form_field_path FROM clinical_diagnosis WHERE clinical_diagnosis = 'Confirmed malignancy' UNION SELECT patient_id, encounter_id, diagnosis, reference_form_field_path FROM diagnosis WHERE diagnosis = 'Confirmed malignancy') cdcm
 		ON cdcm.encounter_id = ic.encounter_id AND cdcm.reference_form_field_path = ic.form_field_path 
 	LEFT JOIN (SELECT * FROM "05_initial_consultation_confirmed_malignancy_details" WHERE topography_of_the_tumour_confirmed = 'Cervix Uteri') iccmd 
 		ON ic.encounter_id = iccmd.encounter_id
-	LEFT JOIN (SELECT * FROM clinical_diagnosis WHERE clinical_diagnosis = 'Suspected malignancy') cdsm
+	LEFT JOIN (SELECT patient_id, encounter_id, clinical_diagnosis AS diagnosis, reference_form_field_path FROM clinical_diagnosis WHERE clinical_diagnosis = 'Suspected malignancy' UNION SELECT patient_id, encounter_id, diagnosis, reference_form_field_path FROM diagnosis WHERE diagnosis = 'Suspected malignancy') cdsm
 		ON cdsm.encounter_id = ic.encounter_id AND cdsm.reference_form_field_path = ic.form_field_path 
 	LEFT JOIN (SELECT * FROM "05_initial_consultation_suspected_malignancy_details" WHERE topography_of_the_tumour_suspected = 'Cervix Uteri') icsmd 
 		ON ic.encounter_id = icsmd.encounter_id
-	LEFT JOIN (SELECT * FROM clinical_diagnosis WHERE clinical_diagnosis = 'Precancerous lesions') cdpl
+	LEFT JOIN (SELECT patient_id, encounter_id, clinical_diagnosis AS diagnosis, reference_form_field_path FROM clinical_diagnosis WHERE clinical_diagnosis = 'Precancerous lesions' UNION SELECT patient_id, encounter_id, diagnosis, reference_form_field_path FROM diagnosis WHERE diagnosis = 'Precancerous lesions') cdpl
 		ON cdpl.encounter_id = ic.encounter_id AND cdpl.reference_form_field_path = ic.form_field_path 
-	LEFT JOIN (SELECT * FROM clinical_diagnosis WHERE clinical_diagnosis = 'Abnormal findings') cdaf
+	LEFT JOIN (SELECT patient_id, encounter_id, clinical_diagnosis AS diagnosis, reference_form_field_path FROM clinical_diagnosis WHERE clinical_diagnosis = 'Abnormal findings' UNION SELECT patient_id, encounter_id, diagnosis AS diagnosis, reference_form_field_path FROM diagnosis WHERE diagnosis = 'Abnormal findings') cdaf
 		ON cdaf.encounter_id = ic.encounter_id AND cdaf.reference_form_field_path = ic.form_field_path),
 follow_up_mdt AS (
 SELECT
@@ -365,7 +366,7 @@ SELECT
 	(DATE_PART('year', AGE(pe.date_completed, rd.date_created::date)))*12+DATE_PART('Month', AGE(pe.date_completed, rd.date_created::date)) AS months_of_follow,
 	DATE_PART('year', AGE(pe.date_completed, rd.date_created::date)) AS years_of_follow
 FROM patient_identifier ptid
-JOIN pre_treatment_mdt ptmdt ON ptid.patient_id = ptmdt.patient_id
+LEFT JOIN pre_treatment_mdt ptmdt ON ptid.patient_id = ptmdt.patient_id
 JOIN registration_date rd ON ptid.patient_id = rd.patient_id
 JOIN person_details_default pdd ON ptid.patient_id = pdd.person_id
 JOIN person_address_default pad ON ptid.patient_id = pad.person_id
@@ -394,4 +395,28 @@ LEFT JOIN vulva_surgical_report vsr ON ptid.patient_id = vsr.patient_id
 LEFT JOIN biopsy_taken bt ON ptid.patient_id = bt.patient_id
 LEFT JOIN program_open po ON ptid.patient_id = po.patient_id
 LEFT JOIN program_exit pe ON ptid.patient_id = pe.patient_id 
-WHERE (ptmdt.row = 1 OR ptmdt.row IS NULL) AND (ic.row = 1 OR ic.row IS NULL) AND (fumdt.row = 1 OR fumdt.row IS NULL) AND (scs.row = 1 OR scs.row IS NULL) AND (ph.row = 1 OR ph.row IS NULL) AND (vs.row = 1 OR vs.row IS NULL) AND (hr.row = 1 OR hr.row IS NULL) AND (sae.row = 1 OR sae.row IS NULL) AND (pe.row = 1 OR pe.row IS NULL) AND (lv.row = 1 OR lv.row IS NULL) AND (scd.row = 1 OR scd.row IS NULL) AND (sapd.row = 1 OR sapd.row IS NULL) AND (na.row = 1 OR na.row IS NULL) AND (fs.row = 1 OR fs.row IS NULL) AND (lb.row = 1 OR lb.row IS NULL) AND (rah.row = 1 OR rah.row IS NULL ) AND (tah.row = 1 OR tah.row IS NULL) AND (rvh.row = 1 OR rvh.row IS NULL) AND (tvh.row = 1 OR tvh.row IS NULL) AND (el.row = 1 OR el.row IS NULL) AND (op.row = 1 OR op.row IS NULL) AND (osr.row = 1 OR osr.row IS NULL) AND (vsr.row = 1 OR vsr.row IS NULL) AND (bt.row = 1 OR bt.row IS NULL)AND (po.row = 1 OR po.row IS NULL);
+WHERE (ptmdt.row = 1 OR ptmdt.row IS NULL) AND 
+	(ic.row = 1 OR ic.row IS NULL) AND 
+	(fumdt.row = 1 OR fumdt.row IS NULL) AND 
+	(scs.row = 1 OR scs.row IS NULL) AND 
+	(ph.row = 1 OR ph.row IS NULL) AND 
+	(vs.row = 1 OR vs.row IS NULL) AND 
+	(hr.row = 1 OR hr.row IS NULL) AND 
+	(sae.row = 1 OR sae.row IS NULL) AND 
+	(pe.row = 1 OR pe.row IS NULL) AND 
+	(lv.row = 1 OR lv.row IS NULL) AND 
+	(scd.row = 1 OR scd.row IS NULL) AND 
+	(sapd.row = 1 OR sapd.row IS NULL) AND 
+	(na.row = 1 OR na.row IS NULL) AND 
+	(fs.row = 1 OR fs.row IS NULL) AND 
+	(lb.row = 1 OR lb.row IS NULL) AND 
+	(rah.row = 1 OR rah.row IS NULL ) AND 
+	(tah.row = 1 OR tah.row IS NULL) AND 
+	(rvh.row = 1 OR rvh.row IS NULL) AND 
+	(tvh.row = 1 OR tvh.row IS NULL) AND 
+	(el.row = 1 OR el.row IS NULL) AND 
+	(op.row = 1 OR op.row IS NULL) AND 
+	(osr.row = 1 OR osr.row IS NULL) AND 
+	(vsr.row = 1 OR vsr.row IS NULL) AND 
+	(bt.row = 1 OR bt.row IS NULL) AND 
+	(po.row = 1 OR po.row IS NULL);
