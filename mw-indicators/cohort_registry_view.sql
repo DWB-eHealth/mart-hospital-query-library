@@ -50,7 +50,6 @@ initial_consultation AS (
 		CASE WHEN cdpl.diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_precancerous_lesions,
 		CASE WHEN cdaf.diagnosis IS NOT NULL THEN 'Yes' ELSE NULL END AS initial_abnormal_findings
 	FROM "05_initial_consultation" ic 
--- UPDATE HERE TO INCLUDE NEW DIAGANOSIS TABLES
 	LEFT JOIN (SELECT patient_id, encounter_id, clinical_diagnosis AS diagnosis, reference_form_field_path FROM clinical_diagnosis WHERE clinical_diagnosis = 'Confirmed malignancy' UNION SELECT patient_id, encounter_id, diagnosis, reference_form_field_path FROM diagnosis WHERE diagnosis = 'Confirmed malignancy') cdcm
 		ON cdcm.encounter_id = ic.encounter_id AND cdcm.reference_form_field_path = ic.form_field_path 
 	LEFT JOIN (SELECT * FROM "05_initial_consultation_confirmed_malignancy_details" WHERE topography_of_the_tumour_confirmed = 'Cervix Uteri') iccmd 
@@ -258,6 +257,14 @@ biopsy_taken AS (
 		SELECT patient_id, date_recorded, 'Yes' AS biopsy
 		FROM "08_colposcopy"
 		WHERE biopsies_number_of_specimen_s_collected IS NOT NULL OR biopsies_number_of_specimen_s_collected > 0) foo),
+program_first AS (
+	SELECT 
+		patient_id,
+		CASE WHEN program_id = 1 THEN 'Oncogynae' WHEN program_id = 2 THEN 'Palliative Care' ELSE NULL END AS program_name,
+		date_enrolled::date, 
+		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY patient_program_id) AS row 
+	FROM patient_program_data_default 
+	WHERE voided = 'false'),
 program_open AS (
 	SELECT 
 		patient_id,
@@ -294,10 +301,11 @@ SELECT
 	LOWER(pad.address3) AS district, 
 	LOWER(pad.address2) AS region, 
 	LOWER(pad.address1) AS country,
-	rd.date_created::date AS enrollment_date,
-	AGE(CURRENT_DATE, rd.date_created::date) AS time_since_enrollment,
-	(DATE_PART('year', AGE(CURRENT_DATE, rd.date_created::date)))*12+DATE_PART('Month', AGE(CURRENT_DATE, rd.date_created::date)) AS months_since_enrollment,
-	DATE_PART('year', AGE(CURRENT_DATE, rd.date_created::date)) AS years_since_enrollment,
+	rd.date_created::date AS registration_date,
+	pf.date_enrolled AS enrollment_date,
+	AGE(CURRENT_DATE, pf.date_enrolled) AS time_since_enrollment,
+	(DATE_PART('year', AGE(CURRENT_DATE, pf.date_enrolled)))*12+DATE_PART('Month', AGE(CURRENT_DATE, pf.date_enrolled)) AS months_since_enrollment,
+	DATE_PART('year', AGE(CURRENT_DATE, pf.date_enrolled)) AS years_since_enrollment,
 	ph.reason_for_referral,
 	ph.referral_facility,
 	ph.referral_facility_name,
@@ -393,6 +401,7 @@ LEFT JOIN other_cervical_surgical_procedures op ON ptid.patient_id = op.patient_
 LEFT JOIN ovary_surgical_report osr ON ptid.patient_id = osr.patient_id
 LEFT JOIN vulva_surgical_report vsr ON ptid.patient_id = vsr.patient_id
 LEFT JOIN biopsy_taken bt ON ptid.patient_id = bt.patient_id
+LEFT JOIN program_first pf ON ptid.patient_id = pf.patient_id
 LEFT JOIN program_open po ON ptid.patient_id = po.patient_id
 LEFT JOIN program_exit pe ON ptid.patient_id = pe.patient_id 
 WHERE (ptmdt.row = 1 OR ptmdt.row IS NULL) AND 
@@ -419,4 +428,5 @@ WHERE (ptmdt.row = 1 OR ptmdt.row IS NULL) AND
 	(osr.row = 1 OR osr.row IS NULL) AND 
 	(vsr.row = 1 OR vsr.row IS NULL) AND 
 	(bt.row = 1 OR bt.row IS NULL) AND 
+	(pf.row = 1 OR pf.row IS NULL) AND
 	(po.row = 1 OR po.row IS NULL);
