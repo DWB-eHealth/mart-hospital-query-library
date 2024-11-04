@@ -1,0 +1,317 @@
+{
+  "jobs": [
+    {
+      "name": "Programs",
+      "type": "programs",
+      "chunkSizeToRead": "500"
+    },
+    {
+      "name": "Patients",
+      "type": "patients",
+      "chunkSizeToRead": "500"
+    },
+    {
+      "name": "Appointments",
+      "type": "appointments",
+      "chunkSizeToRead": "500",
+      "groupedJobConfigs": [
+        {
+          "tableName": "appointment_service_default",
+          "columnsToIgnore": [
+            "speciality"
+          ]
+        },
+        {
+          "tableName": "patient_appointment_default",
+          "columnsToIgnore": [
+            "comments"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bed Management",
+      "type": "bedManagement",
+      "chunkSizeToRead": "500"
+    },
+    {
+      "name": "Location",
+      "type": "location",
+      "chunkSizeToRead": "500"
+    },
+    {
+      "name": "Operation Theater",
+      "type": "operationTheater",
+      "chunkSizeToRead": "500"
+    },
+    {
+      "name": "Person",
+      "type": "person",
+      "chunkSizeToRead": "500",
+      "groupedJobConfigs": [
+        {
+          "tableName": "person_attributes",
+          "columnsToIgnore": [
+            "primaryContact",
+            "secondaryContact",
+            "primaryRelative",
+            "id1Document",
+            "id1DocNumber",
+            "id1FullNameEnglish",
+            "id1FullNameArabic",
+            "id1DateOfExpiry",
+            "id2Document",
+            "id2DocNumber",
+            "id2FullNameEnglish",
+            "id2FullNameArabic",
+            "id2DateOfExpiry",
+            "id3Document",
+            "id3DocNumber",
+            "id3FullNameEnglish",
+            "id3FullNameArabic",
+            "id3DateOfExpiry",
+            "familyNameLocal",
+            "givenNameLocal",
+            "middleNameLocal",
+            "legalRepFullNameEnglish",
+            "legalRepFullNameArabic",
+	    "Phone Number 1",
+            "phoneNumber1",
+            "phoneNumber2",
+            "phoneNumber3",
+            "emailAddress",
+            "whatsapp",
+            "viber",
+            "facebook",
+            "caretakerPhoneNumber1",
+            "caretakerPhoneNumber2",
+            "caretakerEmail",
+            "caretakerWhatsapp",
+            "caretakerViber",
+            "caretakerFacebook",
+            "campComments",
+            "campDistrict",
+            "campVillage",
+            "caretakerNameArabic",
+            "caretakerNameEnglish",
+            "caretakerDob",
+            "emergencyContactName",
+            "emergencyContactNumber",
+            "legalRepDob",
+            "nameoftheBlock",
+            "nameoftheStreet",
+            "orkut",
+            "spokenLanguages"
+          ]
+        },
+        {
+          "tableName": "person_details_default",
+          "columnsToIgnore": [
+            "prefix",
+            "given_name",
+            "middle_name",
+            "family_name_prefix",
+            "family_name",
+            "family_name2",
+            "family_name_suffix",
+            "birthdate"
+          ]
+        },
+        {
+          "tableName": "person_address_default",
+          "columnsToIgnore": [
+            "address1",
+            "address2",
+            "address4",
+            "address6"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Provider",
+      "type": "provider",
+      "chunkSizeToRead": "500"
+    },
+    {
+      "name": "Visits And Encounters",
+      "type": "visitsAndEncounters",
+      "chunkSizeToRead": "500"
+    },
+    {
+      "name": "Medication And Orders",
+      "type": "medicationAndOrders",
+      "chunkSizeToRead": "500",
+      "groupedJobConfigs": [
+        {
+          "tableName": "medication_data_default",
+          "columnsToIgnore": [
+            "instructions",
+            "stop_notes",
+            "additional_instructions"
+          ]
+        }
+      ]
+    },
+    {
+	    "name": "Medication Is Dot",
+	    "type": "customSQL",
+	    "tableName": "medication_is_dot",
+	    "readerSql": "SELECT order_id, as_needed AS is_dot FROM drug_order WHERE as_needed = 1",
+	    "incrementalUpdateConfig": {
+		    "updateOn": "order_id",
+		    "eventCategory": "Order",
+		    "openmrsTableName": "drug_order"
+      }          
+    },
+    {
+      "name": "Bacteriology Data",
+      "type": "bacteriology",
+      "incrementalUpdateConfig": {
+        "updateOn": "encounter_id",
+        "eventCategory": "Encounter",
+        "openmrsTableName": "encounter"
+      }
+    },
+    {
+      "name": "MetaData Dictionary",
+      "type": "metadata",
+      "conceptReferenceSource": "MSF-INTERNAL"
+    },
+    {
+      "name": "Obs Data",
+      "type": "obs",
+      "incrementalUpdateConfig": {
+        "updateOn": "encounter_id",
+        "eventCategory": "Encounter",
+        "openmrsTableName": "encounter"
+      },
+      "separateTableConfig": {
+        "enableForAddMoreAndMultiSelect": true,
+        "separateTables": [
+        ]
+      },
+      "ignoreAllFreeTextConcepts": true,
+      "columnsToIgnore": [
+        "Video",
+        "Image",
+        "Documents, Image Upload",
+        "Documents, Image",
+        "FUP, Dismissal confirmed",
+        "FUP, Dismissal reason",
+        "HE, Pregnancy status",
+        "HE, Drug and Alcohol use"
+      ],
+      "includeFreeTextConceptNames": [
+        "MH, Referred by",
+        "FSTG, Comments",
+        "FSTG, Type of medical information needed for next submission",
+        "FSTG, Comments about postpone reason",
+        "FSTG, Comments about refusal",
+        "FSTG, Document(s) needed to be complete",
+        "FSTG, Comments about Anaesthesia validation",
+        "FST, Type of medical information needed for next submission",
+        "FUP, Comments about Defaulter",
+        "FUP, Comments about dismissal",
+        "FUP, Comments about further stage admission",
+        "FUP, Comments about MBA",
+        "FUP, Comments about next follow-up",
+        "FUP, Comments about re-admission",
+        "FV, Comments on FV",
+        "DIA, Medical Diagnosis non coded",
+        "DIA, Surgical Diagnosis non coded",
+        "Alerts, Non coded",
+        "OR, Operation performed non coded",
+        "SAP, Non-coded Planned procedure",
+        "MD, Non-Coded Procedures performed outside AMH",
+        "SFP, Non coded Planned Procedure (surgical)",
+        "NP, Comments",
+        "NP, Comments on Network physio goals",
+        "NP, Network physio feedback to the surgeons",
+        "NP, Network physio treatment goals",
+        "NP, Notes about network physio special cases",
+        "NP, Other discharge reason, network physio",
+        "NP, Other physiotherapy prescription",
+        "NP, Referred by network physio to",
+        "NP, Special case, other",
+        "NP, Target/ Modalities/ Specifications"
+      ]
+    },
+    {
+      "name": "Disposition Data",
+      "type": "disposition",
+      "incrementalUpdateConfig": {
+        "updateOn": "encounter_id",
+        "eventCategory": "Encounter",
+        "openmrsTableName": "encounter"
+      },
+      "columnsToIgnore": [
+        "Disposition Note"
+      ]
+    }
+  ],
+  "procedures":[
+    {
+      "name":"Discharge Date Procedure",
+      "sourceFilePath":"classpath:procedureSql/dischargeDateProc.sql"
+    },
+    {
+      "name":"Age Group Procedure",
+      "sourceFilePath":"classpath:procedureSql/ageGroupProc.sql"
+    }
+  ],
+  "views": [
+    {
+      "name": "patient_program_view",
+      "sourceFilePath":"classpath:viewSql/patientProgramView.sql"
+    },
+    {
+      "name": "patient_program_state_view",
+      "sourceFilePath": "classpath:viewSql/patientProgramStateView.sql"
+    },
+    {
+      "name": "patient_visits_encounters_view",
+      "sourceFilePath": "classpath:viewSql/patientVisitsEncountersView.sql"
+    },
+    {
+      "name": "appointment_admin_panel_view",
+      "sql": "SELECT * FROM appointment_service_default LEFT OUTER JOIN service_availability_default USING (appointment_service_id, service_name)"
+    },
+    {
+      "name": "patient_details_view",
+      "sourceFilePath": "classpath:viewSql/patientDetailsView.sql"
+    },
+    {
+      "name": "patient_information_view",
+      "sql": "SELECT pd.person_id AS patient_id, pd.gender, pd.birthyear, pd.birthtime, pd.birthdate_estimated, pd.death_date, pd.deathdate_estimated, pd.cause_of_death, pad.address3, pad.address5, pad.address7, pad.address8, pad.address9, pad.address10, pad.address11, pad.address12, pad.address13, pad.address14, pad.address15, pad.city_village, pad.state_province, pad.postal_code, pad.country, pad.county_district, pad.latitude, pad.longitude, pad.start_date, pad.end_date, pa.* FROM person_details_default pd LEFT JOIN person_attributes pa ON pa.person_id = pd.person_id LEFT JOIN person_address_default pad ON pad.person_id = pd.person_id WHERE pad.preferred = 'true'"
+    },
+    {
+      "name":"bed_management_view",
+      "sourceFilePath":"classpath:viewSql/bedManagementView.sql"
+    },
+    {
+      "name":"bed_management_locations_view",
+      "sourceFilePath":"classpath:viewSql/locationWiseDischarge.sql"
+    },
+    {
+      "name": "patient_bed_view",
+      "sourceFilePath": "classpath:viewSql/patientBedView.sql"
+    },
+    {
+      "name": "patient_operation_theater_view",
+      "sourceFilePath": "classpath:viewSql/patientOperationTheaterView.sql"
+    },
+    {
+      "name": "patient_appointment_view",
+      "sourceFilePath": "classpath:viewSql/patientAppointmentView.sql"
+    },
+    {
+      "name": "patient_program_medication_view",
+      "sql": "SELECT pd.person_id AS patient_id, ppd.program_id, md.patient_program_name AS program_name, ppd.date_enrolled, ppd.date_completed, ppd.program_outcome, pd.gender, pd.birthyear            AS birth_year, EXTRACT(YEAR FROM (SELECT age( md.start_date, TO_DATE(CONCAT('01-01-', pd.birthyear), 'dd-MM-yyyy')))) AS age_at_medication, age_group(md.start_date, TO_DATE(CONCAT('01-01-', pd.birthyear), 'dd-MM-yyyy')) AS age_group_at_medication, pd.dead, pa.*, md.patient_program_id, md.encounter_id, md.encounter_type_name, md.order_id, md.orderer_name, md.coded_drug_name, md.non_coded_drug_name, md.dose, md.dose_units, md.frequency, md.route, md.start_date           AS medication_start_date, md.calculated_end_date  AS medication_calculated_end_date, md.date_stopped         AS medication_stopped_date, md.stop_reason, md.duration, md.duration_units, md.quantity, md.quantity_units, md.dispense             AS is_dispensed, md.visit_id, md.visit_type FROM person_details_default pd LEFT JOIN person_attributes pa ON pa.person_id = pd.person_id LEFT JOIN medication_data_default md ON md.patient_id = pd.person_id LEFT OUTER JOIN patient_program_data_default ppd ON ppd.patient_id = md.patient_id and ppd.patient_program_id = md.patient_program_id"
+    },
+    {
+      "name": "patient_bed_tags_history_view",
+      "sourceFilePath": "classpath:viewSql/patientBedTagView.sql"
+    }
+  ]
+}
