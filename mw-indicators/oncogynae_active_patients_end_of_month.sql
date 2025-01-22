@@ -54,5 +54,5 @@ SELECT
 	dap.reporting_day,
 	dap.active_patients
 FROM daily_active_patients dap
-WHERE dap.last_day_of_month = 1 and dap.reporting_day > date_trunc('MONTH', CURRENT_DATE) - INTERVAL '1 year'
+WHERE dap.last_day_of_month = 1 
 GROUP BY dap.reporting_day, dap.active_patients
