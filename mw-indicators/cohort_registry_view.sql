@@ -221,6 +221,18 @@ total_vaginal_hysterectomy AS (
 	FROM procedure_performed pp
 	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
 	WHERE pp.procedure_performed = 'Total vaginal hysterectomy'),
+bilateral_salpingectomy AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS bilateral_salpingectomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed = 'Bilateral salpingectomy'),
+bilateral_oophorectomy AS (
+	SELECT
+    	pp.patient_id, 'Yes' AS bilateral_oophorectomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
+	FROM procedure_performed pp
+	JOIN "19_cervical_surgical_report" csr USING(encounter_id)
+	WHERE pp.procedure_performed = 'Bilateral oophorectomy'),
 exploratory_laparotomy AS (
 	SELECT
     	pp.patient_id, 'Yes' AS exploratory_laparotomy, date_of_surgery, ROW_NUMBER() OVER (PARTITION BY pp.patient_id ORDER BY csr.date_of_surgery) AS ROW
@@ -360,6 +372,8 @@ SELECT
 	tah.total_abdominal_hysterectomy,
 	rvh.radical_vaginal_hysterectomy,
 	tvh.total_vaginal_hysterectomy,
+	bs.bilateral_salpingectomy,
+	bo.bilateral_oophorectomy,
 	el.exploratory_laparotomy,
 	op.other_cervical_surgical_procedures,
 	osr.ovary_surgical_report,
@@ -396,6 +410,8 @@ LEFT JOIN radical_abdominal_hysterectomy rah ON ptid.patient_id = rah.patient_id
 LEFT JOIN total_abdominal_hysterectomy tah ON ptid.patient_id = tah.patient_id
 LEFT JOIN radical_vaginal_hysterectomy rvh ON ptid.patient_id = rvh.patient_id
 LEFT JOIN total_vaginal_hysterectomy tvh ON ptid.patient_id = tvh.patient_id
+LEFT JOIN bilateral_salpingectomy bs ON ptid.patient_id = bs.patient_id
+LEFT JOIN bilateral_oophorectomy bo ON ptid.patient_id = bo.patient_id
 LEFT JOIN exploratory_laparotomy el ON ptid.patient_id = el.patient_id
 LEFT JOIN other_cervical_surgical_procedures op ON ptid.patient_id = op.patient_id
 LEFT JOIN ovary_surgical_report osr ON ptid.patient_id = osr.patient_id
@@ -423,6 +439,8 @@ WHERE (ptmdt.row = 1 OR ptmdt.row IS NULL) AND
 	(tah.row = 1 OR tah.row IS NULL) AND 
 	(rvh.row = 1 OR rvh.row IS NULL) AND 
 	(tvh.row = 1 OR tvh.row IS NULL) AND 
+	(bs.row = 1 OR bs.row IS NULL) AND
+	(bo.row = 1 OR bo.row IS NULL) AND
 	(el.row = 1 OR el.row IS NULL) AND 
 	(op.row = 1 OR op.row IS NULL) AND 
 	(osr.row = 1 OR osr.row IS NULL) AND 
