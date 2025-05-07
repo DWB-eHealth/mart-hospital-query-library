@@ -268,7 +268,12 @@ biopsy_taken AS (
 		UNION
 		SELECT patient_id, date_recorded, 'Yes' AS biopsy
 		FROM "33_old_colposcopy"
-		WHERE biopsies_number_of_specimen_s_collected IS NOT NULL OR biopsies_number_of_specimen_s_collected > 0) foo),
+		WHERE biopsies_number_of_specimen_s_collected IS NOT NULL OR biopsies_number_of_specimen_s_collected > 0
+		UNION
+		SELECT cm.patient_id, cr.date_recorded, 'Yes' AS biopsy
+		FROM colposcopic_management cm 
+		LEFT JOIN "08_colposcopy_report" cr USING(encounter_id)
+		WHERE colposcopic_management = 'Cervical biopsy') foo),
 program_first AS (
 	SELECT 
 		patient_id,
