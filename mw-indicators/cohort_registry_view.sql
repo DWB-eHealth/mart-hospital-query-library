@@ -267,7 +267,7 @@ biopsy_taken AS (
 		WHERE procedure_performed_gynaecological_exam IN ('Biopsy of cervix', 'Biopsy')
 		UNION
 		SELECT patient_id, date_recorded, 'Yes' AS biopsy
-		FROM "08_colposcopy"
+		FROM "33_old_colposcopy"
 		WHERE biopsies_number_of_specimen_s_collected IS NOT NULL OR biopsies_number_of_specimen_s_collected > 0) foo),
 program_first AS (
 	SELECT 
