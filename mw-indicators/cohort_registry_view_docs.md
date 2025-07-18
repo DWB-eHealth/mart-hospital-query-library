@@ -13,7 +13,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 | Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
-| `Patient_Identifier` | unique identifier for the patient, used to identify patient records in Bahmni | text | N/A | Registration | Patient Identifier | N/A |
+| `Patient_Identifier` | unique identifier for the patient, used to identify patient records in Bahmni | text | N/A | Registration | Patient Identifier | [`Patient_Identifier`](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/a4a5228c1a099b6b85b71e543a116a0751ea7600/mw-indicators/cohort_registry_view_docs.md#L209) |
 | `patient_id` | unique identifier for the patient, used to make patient-level connections between Analytics tables and views | text | N/A | Registration | patient_id | N/A |
 | `age_at_enrollment` | patient's age in years at registration in Bahmni | int | N/A | Registration | Age | N/A |
 | `age_group_at_enrollment` | patient's age in years at registration in Bahmni, categorized by age group | text | 0-17; 18-24; 25-49; 50+ | Registration | Age | N/A |
