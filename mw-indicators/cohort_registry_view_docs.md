@@ -11,23 +11,23 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 👩 Patient demographics
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
-| `Patient_Identifier` | unique identifier for the patient, used to identify patient records in Bahmni | text | N/A | Registration | Patient Identifier | [`Patient_Identifier`](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/a4a5228c1a099b6b85b71e543a116a0751ea7600/mw-indicators/cohort_registry_view_docs.md#L209) |
-| `patient_id` | unique identifier for the patient, used to make patient-level connections between Analytics tables and views | text | N/A | Registration | patient_id | N/A |
-| `age_at_enrollment` | patient's age in years at registration in Bahmni | int | N/A | Registration | Age | N/A |
-| `age_group_at_enrollment` | patient's age in years at registration in Bahmni, categorized by age group | text | 0-17; 18-24; 25-49; 50+ | Registration | Age | N/A |
-| `ta_town` | patient's traditional authority or town of residence | text | N/A | Registration | Traditional Authority/Town | N/A |
-| `district` | patient's district of residence | text | N/A | Registration | District | N/A |
-| `region` | patient's region of residence | text | N/A | Registration | Region | N/A |
-| `country` | patient's country of residence | text | N/A | Registration | Country | N/A |
-| `patient_education_level` | highest education level attained as reported in the Social Assessment form - data is from the most recent form | text | None; Illiterate; Primary school; High school; College/University | Clinical - Social Assessment form | Patient education level | social_assessment_edu |
+| `Patient_Identifier` | unique identifier for the patient, used to identify patient records in Bahmni | text | N/A | Registration | Patient Identifier | [Patient_Identifier](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/a4a5228c1a099b6b85b71e543a116a0751ea7600/mw-indicators/cohort_registry_view_docs.md#L209) |
+| `patient_id` | unique identifier for the patient, used to make patient-level connections between Analytics tables and views | text | N/A | Registration | patient_id | [Patient_Identifier](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/a4a5228c1a099b6b85b71e543a116a0751ea7600/mw-indicators/cohort_registry_view_docs.md#L209) |
+| `age_at_enrollment` | patient's age in years at registration in Bahmni | int | N/A | Registration | Age | [person_details_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L211) |
+| `age_group_at_enrollment` | patient's age in years at registration in Bahmni, categorized by age group | text | 0-17; 18-24; 25-49; 50+ | Registration | Age | [person_details_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L211) |
+| `ta_town` | patient's traditional authority or town of residence | text | N/A | Registration | Traditional Authority/Town | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
+| `district` | patient's district of residence | text | N/A | Registration | District | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
+| `region` | patient's region of residence | text | N/A | Registration | Region | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
+| `country` | patient's country of residence | text | N/A | Registration | Country | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
+| `patient_education_level` | highest education level attained as reported in the Social Assessment form - data is from the most recent form | text | None; Illiterate; Primary school; High school; College/University | Clinical - Social Assessment form | Patient education level | [social_assessment_edu](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L179) |
 
 ---
 
 ### 🧾 Cohort enrollment
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `registration_date` | date the patient was registered in Bahmni | date | N/A | Registration | Registration date | N/A |
 | `enrollment_date` | date the patient was first enrolled in either oncogynae or palliative care program | date | N/A | Programs | Start Date | program_first |
@@ -43,7 +43,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 🔬 Last health status
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `pregnancies` | number of pregnancies as reported in the Patient History form - if multiple Patient History forms are completed, the data from the most recent form is used | int | N/A | Clinical - Patient History form | Number of previous pregnancies including current if applicable | patient_history |
 | `hpv_status` | HPV status as reported in the Patient History form - if multiple Patient History forms are completed, the data from the most recent form is used | text | Not Done; Negative; Positive; Unknown | Clinical - Patient History form | HPV status | patient_history |
@@ -57,7 +57,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 🩺 Initial consultation
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `initial_consultation_date` | date of initial consultation from Initial Consultation form - if multiple Initial Consultation forms are completed, the date from the first form is used | date | N/A | Clinical - Initial Consultation form | Date recorded | initial_consultation |
 | `initial_ecog_performance_status` | ECOG performance status reported in the Initial Consultation form - if multiple Initial Consultation forms are completed, the data from the first form is used | int | 0-5 | Clinical - Initial Consultation form | ECOG performance status | initial_consultation |
@@ -72,7 +72,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 👩‍⚕️ Pre-treatment MDT
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `premdt_date` | date of pre-treatment MDT from the Pre Treatment MDT form - if multiple Pre Treatment MDT forms are completed, data from the first form is used | date | N/A | Clinical - Pre Treatment MDT | Date recorded | pre_treatment_mdt |
 | `premdt_confirmed_malignancy` | if confirmed malignancy was recorded in the Pre Treatment MDT form - if multiple Pre Treatment MDT forms are completed, data from the first form is used | text | Yes; null | Clinical - Pre Treatment MDT | Clinical diagnosis | pre_treatment_mdt |
@@ -91,7 +91,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 🔄 Follow-up MDT
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `fumdt_date` | date of follow-up MDT from the Follow-up MDT form - if multiple Follow-up MDT forms are completed, data from the most recent form is used | date | N/A | Clinical - Follow-up MDT | Date recorded | follow_up_mdt |
 | `fumdt_chemotherapy_response` | chemotherapy response recorded in the Follow-up MDT form - if multiple Follow-up MDT forms are completed, data from the most recent form is used | text | Complete response; >= 30 percentage partial response; <= 30 percentage partial response; Stable disease; Progressive disease | Clinical - Follow-up MDT | Chemotherapy response | follow_up_mdt |
@@ -106,7 +106,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 🧬 Cancer status
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `first_disclosure_date` | date of the first diagnosis disclosure recorded in the Subsequent Consultation form, only Subsequent Consultation forms where reason for visit is recorded as "Diagnosis disclosure" and the date recorded in the form is after the date on or after the date of the first Pre Treatment MDT - if there are multiple forms fitting this criteria, data from the first form is used | date | N/A | Clinical - Subsequent Consultation form; Pre Treatment MDT form | Date recorded | subsequent_consultation_disclosure |
 | `first_mh_assessment_date` | date of the first post-disclosure mental health assessment from the Social Assessment form, only Social Assessment forms dated after the first disclosure date are used - if there are multiple forms fitting this criteria, data from the first form is used | date | N/A | Clinical - Social Assessment form; Subsequent Consultation form; Pre Treatment MDT form | Date recorded | social_assessment_post_disclosure |
@@ -117,7 +117,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 📅 Appointments
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `last_visit_date` | date of patients most recent visit recorded in the Initial Consultation form, Subsequent Consultations form, Pre Treatment MDT form, Follow-up MDT form, Supportive Care Assessment form, or the Appointment Scheduling module (only checked in or completed appointments for Initial gynaecology consultation, Subsequent gynaecology consultation, Palliative Care, Subsequent disclosure visit services are included) | date | N/A | Appointment Scheduling; Clinical - Initial Consultation form; Subsequent Consultations form; Pre Treatment MDT form; Follow-up MDT form; Supportive Care Assessment form | Appointment start time; Date recorded | last_visit, program_exit |
 | `time_since_last_visit` | years, months, and  days between the last visit date and the current date | int | N/A | Appointment Scheduling; Clinical - Initial Consultation form; Subsequent Consultations form; Pre Treatment MDT form; Follow-up MDT form; Supportive Care Assessment form | Appointment start time; Date recorded | last_visit, program_exit |
@@ -130,7 +130,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 🏥 Surgery & procedures
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `first_surgery_date` | data of first reported surgery from the Cervical Surgical Report form, Ovary Surgical Report form, Vulva Surgical Report form, or LEEP and Conization form - if multiple forms are completed, data from the first form is used | date | N/A | Clinical - Cervical Surgical Report form; Ovary Surgical Report form; Vulva Surgical Report form; LEEP and Conization form | Date of surgery; Date recorded | first_surgery |
 | `radical_abdominal_hysterectomy` | if radical abdominal hysterectomy procedure was performed at any time as recorded in the Cervial Surgical Report form | text | Yes; null | Clinical - Cervical Surgical Report form | Procedure performed | radical_abdominal_hysterectomy |
@@ -150,7 +150,7 @@ The following tables contain a description of all variables avaliable in the `co
 
 ### 🏠 Patient outcome
 
-| Column | Description | Data value type | Value options | Source module/form | Source field/concept | CTE, if applicable |
+| Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
 | `patient_outcome` | outcome recorded in the last program enrollment - if patient is enrolled in multiple programs, outcome is only recorded if all programs are closed & if there are multiple closed programs, the outcome from the last closed program is used | text | Non-cancer diagnosis; QECH Cancer referral; Transferred out; Lost to follow up; Refused care; End of Follow Up; Beyond Curative (Palliative); Death | Programs | Program Outcome | program_exit |
 | `date_completed` | outcome date recorded in the last program enrollment - if patient is enrolled in multiple programs, outcome is only recorded if all programs are closed & if there are multiple closed programs, the outcome from the last closed program is used | date | N/A | Programs | Completed date | program_exit |
