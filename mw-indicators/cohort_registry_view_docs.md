@@ -13,14 +13,14 @@ The following tables contain a description of all variables avaliable in the `co
 
 | Column | Description | Data value type | Value options | Source module/form | Source field/concept | Source |
 |:-------|:------------|:----------------|:--------------|:-------------------|:---------------------|:-------------------|
-| `Patient_Identifier` | unique identifier for the patient, used to identify patient records in Bahmni | text | N/A | Registration | Patient Identifier | [Patient_Identifier](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/a4a5228c1a099b6b85b71e543a116a0751ea7600/mw-indicators/cohort_registry_view_docs.md#L209) |
-| `patient_id` | unique identifier for the patient, used to make patient-level connections between Analytics tables and views | text | N/A | Registration | patient_id | [Patient_Identifier](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/a4a5228c1a099b6b85b71e543a116a0751ea7600/mw-indicators/cohort_registry_view_docs.md#L209) |
-| `age_at_enrollment` | patient's age in years at registration in Bahmni | int | N/A | Registration | Age | [person_details_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L211) |
-| `age_group_at_enrollment` | patient's age in years at registration in Bahmni, categorized by age group | text | 0-17; 18-24; 25-49; 50+ | Registration | Age | [person_details_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L211) |
-| `ta_town` | patient's traditional authority or town of residence | text | N/A | Registration | Traditional Authority/Town | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
-| `district` | patient's district of residence | text | N/A | Registration | District | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
-| `region` | patient's region of residence | text | N/A | Registration | Region | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
-| `country` | patient's country of residence | text | N/A | Registration | Country | [person_address_default](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L212-L213) |
+| `Patient_Identifier` | unique identifier for the patient, used to identify patient records in Bahmni | text | N/A | Registration | Patient Identifier | [Patient_Identifier](#patient-identifier) |
+| `patient_id` | unique identifier for the patient, used to make patient-level connections between Analytics tables and views | text | N/A | Registration | patient_id | [Patient_Identifier](#patient-identifier) |
+| `age_at_enrollment` | patient's age in years at registration in Bahmni | int | N/A | Registration | Age | [person_details_default](#person_details_default) |
+| `age_group_at_enrollment` | patient's age in years at registration in Bahmni, categorized by age group | text | 0-17; 18-24; 25-49; 50+ | Registration | Age | [person_details_default](#person_details_default) |
+| `ta_town` | patient's traditional authority or town of residence | text | N/A | Registration | Traditional Authority/Town | [person_address_default](#person_address_default) |
+| `district` | patient's district of residence | text | N/A | Registration | District | [person_address_default](#person_address_default) |
+| `region` | patient's region of residence | text | N/A | Registration | Region | [person_address_default](#person_address_default) |
+| `country` | patient's country of residence | text | N/A | Registration | Country | [person_address_default](#person_address_default) |
 | `patient_education_level` | highest education level attained as reported in the Social Assessment form - data is from the most recent form | text | None; Illiterate; Primary school; High school; College/University | Clinical - Social Assessment form | Patient education level | [social_assessment_edu](https://github.com/DWB-eHealth/mart-hospital-query-library/blob/bd04f6f6b36346da4481a656765d4741150a9364/mw-indicators/cohort_registry_view_docs.md#L179) |
 
 ---
@@ -206,10 +206,10 @@ The following source tables from the analytics database are referenced in the `c
 
 | Table name | Description | Use |
 |:-----------|:------------|:----|
-| `Patient_Identifier` | used to define the patient population present in the `cohort_register_view` and provide the unique identifier created in the Bahmni registration module | Main query |
-| `registration_date` | provides date patient was created in the Bahmni registration module | Main query |
-| `person_details_default` | provides the current age of the patient recorded in the Bahmni registration module, calculated using the date of birth and the current date | Main query |
-| `person_address_default` | provides the traditional authority/town, district, region, and country of patient recorded in the Bahmni registration module | Main query |
+| <a name="patient-identifier"></a>`Patient_Identifier` | used to define the patient population present in the `cohort_register_view` and provide the unique identifier created in the Bahmni registration module | Main query |
+| <a name="registration_date"></a>`registration_date` | provides date patient was created in the Bahmni registration module | Main query |
+| <a name="person_details_default"></a>`person_details_default` | provides the current age of the patient recorded in the Bahmni registration module, calculated using the date of birth and the current date | Main query |
+| <a name="person_address_default"></a>`person_address_default` | provides the traditional authority/town, district, region, and country of patient recorded in the Bahmni registration module | Main query |
 | `patient_program_data_default` | provides the first, current, and final program enrollment information (enrollment date, current program, program exit date, patient outcome, date of death) for each patient | CTE [`program_first`; `program_open`; `program_exit`] |
 | `patient_appointment_default` | provides last completed, last missed appointment, and next appointment for each patient as captured in the appointment scheduling module | CTE [`last_visit`; `last_appt_missed`; `next_appointment`] |
 | `01_patient_history` | table containing information recorded in the patient history form | CTE [`patient_history`; `hiv_test`] |
