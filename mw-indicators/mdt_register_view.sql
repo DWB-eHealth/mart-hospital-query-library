@@ -1,0 +1,1209 @@
+-- The consultations_mdt CTE creates a list of all initial and subsequent consultations where MDT was flagged as an appointment needed following the consultation.
+WITH consultations_mdt AS (
+    SELECT
+        ic.patient_id,
+        ic.encounter_id,
+        'Initial visit' AS visit_type,
+        ic.form_field_path,
+        ic.date_recorded,
+        ic.mdt_date
+    FROM
+        "05_initial_consultation" ic
+        INNER JOIN appointment_needed an ON ic.encounter_id = an.encounter_id
+        AND ic.form_field_path = an.reference_form_field_path
+    WHERE
+        an.appointment_needed = 'MDT'
+    UNION
+    ALL
+    SELECT
+        sc.patient_id,
+        sc.encounter_id,
+        'Subsequent visit' AS visit_type,
+        sc.form_field_path,
+        sc.date_recorded,
+        sc.mdt_date
+    FROM
+        "07_subsequent_consultation" sc
+        INNER JOIN appointment_needed an ON sc.encounter_id = an.encounter_id
+        AND sc.form_field_path = an.reference_form_field_path
+    WHERE
+        an.appointment_needed = 'MDT'
+),
+-- The confirmed_malignancy CTE aggregates all confirmed cancer diagnosis by consultation form, listing the cancer diagnosis and FIGO staging for each location.  
+confirmed_malignancy AS (
+    SELECT
+        patient_id,
+        encounter_id,
+        visit_type,
+        reference_form_field_path,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                topography_of_the_tumour_confirmed,
+                confirmed_malignancy_diagnosis
+            ),
+            ', '
+            ORDER BY
+                topography_of_the_tumour_confirmed
+        ) AS topo_dx,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                topography_of_the_tumour_confirmed,
+                COALESCE(
+                    clinical_figo_staging_for_cancer_of_the_vulva,
+                    clinical_figo_staging_for_cancer_of_the_vagina,
+                    clinical_figo_staging_for_cancer_of_the_cervix,
+                    clinical_figo_staging_for_cancer_of_the_uterus,
+                    clinical_figo_staging_for_cancer_of_the_ovary
+                )
+            ),
+            ', '
+            ORDER BY
+                topography_of_the_tumour_confirmed
+        ) AS topo_stage,
+        BOOL_OR(confirmed_malignancy_diagnosis IS NOT NULL) AS has_dx,
+        BOOL_OR(topography_of_the_tumour_confirmed IS NOT NULL) AS has_topo,
+        BOOL_OR(
+            COALESCE(
+                clinical_figo_staging_for_cancer_of_the_vulva,
+                clinical_figo_staging_for_cancer_of_the_vagina,
+                clinical_figo_staging_for_cancer_of_the_cervix,
+                clinical_figo_staging_for_cancer_of_the_uterus,
+                clinical_figo_staging_for_cancer_of_the_ovary
+            ) IS NOT NULL
+        ) AS has_figo
+    FROM
+        (
+            SELECT
+                patient_id,
+                encounter_id,
+                'Initial visit' AS visit_type,
+                reference_form_field_path,
+                CASE
+                    WHEN confirmed_malignancy_diagnosis IN (
+                        'Squamous cell carcinoma',
+                        'Adenocarcinoma',
+                        'Adenosquamous carcinoma'
+                    ) THEN confirmed_malignancy_diagnosis
+                    WHEN confirmed_malignancy_diagnosis = 'Other' THEN confirmed_malignancy_diagnosis_other
+                END AS confirmed_malignancy_diagnosis,
+                topography_of_the_tumour_confirmed,
+                clinical_figo_staging_for_cancer_of_the_vulva,
+                clinical_figo_staging_for_cancer_of_the_vagina,
+                clinical_figo_staging_for_cancer_of_the_cervix,
+                clinical_figo_staging_for_cancer_of_the_uterus,
+                clinical_figo_staging_for_cancer_of_the_ovary
+            FROM
+                "05_initial_consultation_confirmed_malignancy_details"
+            UNION
+            ALL
+            SELECT
+                patient_id,
+                encounter_id,
+                'Subsequent visit' AS visit_type,
+                reference_form_field_path,
+                CASE
+                    WHEN confirmed_malignancy_diagnosis IN (
+                        'Squamous cell carcinoma',
+                        'Adenocarcinoma',
+                        'Adenosquamous carcinoma'
+                    ) THEN confirmed_malignancy_diagnosis
+                    WHEN confirmed_malignancy_diagnosis = 'Other' THEN confirmed_malignancy_diagnosis_other
+                END AS confirmed_malignancy_diagnosis,
+                topography_of_the_tumour_confirmed,
+                clinical_figo_staging_for_cancer_of_the_vulva,
+                clinical_figo_staging_for_cancer_of_the_vagina,
+                clinical_figo_staging_for_cancer_of_the_cervix,
+                clinical_figo_staging_for_cancer_of_the_uterus,
+                clinical_figo_staging_for_cancer_of_the_ovary
+            FROM
+                "07_subsequent_consultation_confirmed_malignancy_details"
+        ) cm
+    GROUP BY
+        patient_id,
+        encounter_id,
+        visit_type,
+        reference_form_field_path
+),
+-- The dx CTE brings together the consultation_mdt and confirmed_malignancy CTEs where a confirmed cancer diagnosis and the need for an MDT were reported.
+dx AS (
+    SELECT
+        dx.patient_id,
+        dx.patient_program_id,
+        dx.encounter_id,
+        isc.date_recorded,
+        isc.visit_type,
+        cmd.topo_dx,
+        cmd.topo_stage,
+        isc.mdt_date,
+        COALESCE(cmd.has_dx, FALSE) AS has_dx,
+        COALESCE(cmd.has_topo, FALSE) AS has_topo,
+        COALESCE(cmd.has_figo, FALSE) AS has_figo
+    FROM
+        diagnosis dx
+        INNER JOIN consultations_mdt isc ON dx.encounter_id = isc.encounter_id
+        AND dx.reference_form_field_path = isc.form_field_path
+        LEFT JOIN confirmed_malignancy cmd ON dx.encounter_id = cmd.encounter_id
+        AND dx.reference_form_field_path = cmd.reference_form_field_path
+        AND isc.visit_type = cmd.visit_type
+    WHERE
+        dx.diagnosis = 'Confirmed malignancy'
+        AND isc.date_recorded IS NOT NULL
+),
+-- The histo CTE creates a match tables as the dx CTE but with data from the histopathology tab.
+histo AS (
+    SELECT
+        patient_id,
+        patient_program_id,
+        NULL :: INT AS encounter_id,
+        microbiology_date_of_result AS date_recorded,
+        'Histopathology result' AS visit_type,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                microbiology_cancer_location,
+                microbiology_histological_tumor_type
+            ),
+            ', '
+            ORDER BY
+                microbiology_cancer_location
+        ) AS topo_dx,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                microbiology_cancer_location,
+                microbiology_figo_staging
+            ),
+            ', '
+            ORDER BY
+                microbiology_cancer_location
+        ) AS topo_stage,
+        NULL :: DATE AS mdt_date,
+        BOOL_OR(microbiology_histological_tumor_type IS NOT NULL) AS has_dx,
+        BOOL_OR(microbiology_cancer_location IS NOT NULL) AS has_topo,
+        BOOL_OR(microbiology_figo_staging IS NOT NULL) AS has_figo
+    FROM
+        bacteriology_concept_set
+    WHERE
+        (
+            microbiology_cancer_location IS NOT NULL
+            OR microbiology_histological_tumor_type IS NOT NULL
+        )
+        AND microbiology_date_of_result IS NOT NULL
+    GROUP BY
+        patient_id,
+        patient_program_id,
+        microbiology_date_of_result
+),
+-- The ranked_confirmed CTE combined the dx CTE with the histo CTE and ranks the results first by date, then by form type, and then by the completeness of the diagnosis information.
+ranked_confirmed AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY patient_id
+            ORDER BY
+                date_recorded DESC,
+                CASE
+                    visit_type
+                    WHEN 'Histopathology result' THEN 0
+                    WHEN 'Subsequent visit' THEN 1
+                    WHEN 'Initial visit' THEN 2
+                    ELSE 3
+                END,
+                CASE
+                    WHEN has_dx
+                    AND has_topo
+                    AND has_figo THEN 0
+                    WHEN has_dx
+                    AND has_topo
+                    AND NOT has_figo THEN 1
+                    WHEN has_dx
+                    AND has_figo
+                    AND NOT has_topo THEN 2
+                    WHEN has_topo
+                    AND has_figo
+                    AND NOT has_dx THEN 3
+                    WHEN has_dx
+                    AND NOT has_topo
+                    AND NOT has_figo THEN 4
+                    WHEN has_topo
+                    AND NOT has_dx
+                    AND NOT has_figo THEN 5
+                    WHEN has_figo
+                    AND NOT has_dx
+                    AND NOT has_topo THEN 6
+                    ELSE 7
+                END,
+                COALESCE(encounter_id, 0) DESC
+        ) AS rn_last,
+        ROW_NUMBER() OVER (
+            PARTITION BY patient_id,
+            visit_type
+            ORDER BY
+                date_recorded DESC
+        ) AS rn_last_type
+    FROM
+        (
+            SELECT
+                *
+            FROM
+                dx
+            UNION
+            ALL
+            SELECT
+                *
+            FROM
+                histo
+        ) c
+),
+-- The mdt_frame CTE extracts the most recent confirmed cancer diagnosis from consultations or histo tab and excludes all the results that have an MDT forms completed after the consultation or histo result date. 
+mdt_frame AS (
+    SELECT
+        lc. *
+    FROM
+        (
+            SELECT
+                patient_id,
+                patient_program_id,
+                encounter_id,
+                date_recorded,
+                visit_type,
+                topo_dx,
+                topo_stage,
+                mdt_date
+            FROM
+                ranked_confirmed
+            WHERE
+                rn_last = 1
+        ) lc
+    WHERE
+        NOT EXISTS (
+            SELECT
+                1
+            FROM
+                (
+                    SELECT
+                        patient_id,
+                        date_recorded
+                    FROM
+                        "10_pre_treatment_mdt"
+                    UNION
+                    ALL
+                    SELECT
+                        patient_id,
+                        date_recorded
+                    FROM
+                        "11_follow_up_mdt"
+                ) mdt
+            WHERE
+                lc.patient_id = mdt.patient_id
+                AND mdt.date_recorded >= lc.date_recorded
+        )
+),
+-- The last_proposed_mdt CTE creates a list of all initial and subsequent consultations where MDT was flagged as an appointment needed following the consultation.
+last_proposed_mdt AS (
+    SELECT
+        mf.patient_id, 
+        c.visit_type,
+        mf.date_recorded AS last_result_date,
+        c.date_recorded AS consultation_date,
+        c.mdt_date
+    FROM mdt_frame mf 
+    LEFT OUTER JOIN 
+    (SELECT
+        ic.patient_id,
+        ic.encounter_id,
+        'Initial visit' AS visit_type,
+        ic.form_field_path,
+        ic.date_recorded,
+        ic.mdt_date
+    FROM
+        "05_initial_consultation" ic
+        INNER JOIN appointment_needed an ON ic.encounter_id = an.encounter_id
+        AND ic.form_field_path = an.reference_form_field_path
+    WHERE
+        an.appointment_needed = 'MDT' AND ic.mdt_date IS NOT NULL
+    UNION ALL
+    SELECT
+        sc.patient_id,
+        sc.encounter_id,
+        'Subsequent visit' AS visit_type,
+        sc.form_field_path,
+        sc.date_recorded,
+        sc.mdt_date
+    FROM
+        "07_subsequent_consultation" sc
+        INNER JOIN appointment_needed an ON sc.encounter_id = an.encounter_id
+        AND sc.form_field_path = an.reference_form_field_path
+    WHERE
+        an.appointment_needed = 'MDT' AND sc.mdt_date IS NOT NULL) c
+    ON mf.patient_id = c.patient_id AND mf.date_recorded <= c.mdt_date
+),
+-- The onco_id CTE extracts the oncology ID from the Chemo baseline assessment, if present, and then the patient history if not present in the chemo baseline assessment. 
+onco_id AS (
+    SELECT
+        DISTINCT ON (patient_id) patient_id,
+        form_field_path,
+        oncology_id
+    FROM
+        (
+            SELECT
+                patient_id,
+                onco_id AS oncology_id,
+                date_recorded,
+                form_field_path,
+                1 AS src
+            FROM
+                "26_chemotherapy_baseline_assessment"
+            WHERE
+                onco_id IS NOT NULL
+            UNION
+            ALL
+            SELECT
+                patient_id,
+                oncology_id,
+                date_recorded,
+                form_field_path,
+                2 AS src
+            FROM
+                "01_patient_history"
+            WHERE
+                oncology_id IS NOT NULL
+        ) all_id
+    ORDER BY
+        patient_id,
+        src,
+        date_recorded DESC
+),
+-- The initial_confirmed_malignancy CTE aggregates all confirmed cancer diagnosis by initial consultation form, listing the cancer diagnosis and FIGO staging for each location.  
+initial_confirmed_malignancy AS (
+    SELECT
+        patient_id,
+        encounter_id,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                topography_of_the_tumour_confirmed,
+                confirmed_malignancy_diagnosis
+            ),
+            ', '
+            ORDER BY
+                topography_of_the_tumour_confirmed
+        ) AS topo_dx,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                topography_of_the_tumour_confirmed,
+                COALESCE(
+                    clinical_figo_staging_for_cancer_of_the_vulva,
+                    clinical_figo_staging_for_cancer_of_the_vagina,
+                    clinical_figo_staging_for_cancer_of_the_cervix,
+                    clinical_figo_staging_for_cancer_of_the_uterus,
+                    clinical_figo_staging_for_cancer_of_the_ovary
+                )
+            ),
+            ', '
+            ORDER BY
+                topography_of_the_tumour_confirmed
+        ) AS topo_stage,
+        BOOL_OR(confirmed_malignancy_diagnosis IS NOT NULL) AS has_dx,
+        BOOL_OR(topography_of_the_tumour_confirmed IS NOT NULL) AS has_topo,
+        BOOL_OR(
+            COALESCE(
+                clinical_figo_staging_for_cancer_of_the_vulva,
+                clinical_figo_staging_for_cancer_of_the_vagina,
+                clinical_figo_staging_for_cancer_of_the_cervix,
+                clinical_figo_staging_for_cancer_of_the_uterus,
+                clinical_figo_staging_for_cancer_of_the_ovary
+            ) IS NOT NULL
+        ) AS has_figo
+    FROM
+        (
+            SELECT
+                patient_id,
+                encounter_id,
+                CASE
+                    WHEN confirmed_malignancy_diagnosis IN (
+                        'Squamous cell carcinoma',
+                        'Adenocarcinoma',
+                        'Adenosquamous carcinoma'
+                    ) THEN confirmed_malignancy_diagnosis
+                    WHEN confirmed_malignancy_diagnosis = 'Other' THEN confirmed_malignancy_diagnosis_other
+                END AS confirmed_malignancy_diagnosis,
+                topography_of_the_tumour_confirmed,
+                clinical_figo_staging_for_cancer_of_the_vulva,
+                clinical_figo_staging_for_cancer_of_the_vagina,
+                clinical_figo_staging_for_cancer_of_the_cervix,
+                clinical_figo_staging_for_cancer_of_the_uterus,
+                clinical_figo_staging_for_cancer_of_the_ovary
+            FROM
+                "05_initial_consultation_confirmed_malignancy_details"
+        ) cm
+    GROUP BY
+        patient_id,
+        encounter_id
+),
+-- The initial_dx_ranked CTE brings together initial_confirmed_malignancy CTE with initial consultation form date where a confirmed cancer diagnosis was reported.
+initial_dx_ranked AS (
+    SELECT
+        dx.patient_id,
+        dx.patient_program_id,
+        dx.encounter_id,
+        ic.date_recorded,
+        icm.topo_dx,
+        icm.topo_stage,
+        ROW_NUMBER() OVER (
+            PARTITION BY dx.patient_id
+            ORDER BY
+                ic.date_recorded,
+                CASE
+                    WHEN icm.has_dx
+                    AND icm.has_topo
+                    AND icm.has_figo THEN 0
+                    WHEN icm.has_dx
+                    AND icm.has_topo
+                    AND NOT icm.has_figo THEN 1
+                    WHEN icm.has_dx
+                    AND icm.has_figo
+                    AND NOT icm.has_topo THEN 2
+                    WHEN icm.has_topo
+                    AND icm.has_figo
+                    AND NOT icm.has_dx THEN 3
+                    WHEN icm.has_dx
+                    AND NOT icm.has_topo
+                    AND NOT icm.has_figo THEN 4
+                    WHEN icm.has_topo
+                    AND NOT icm.has_dx
+                    AND NOT icm.has_figo THEN 5
+                    WHEN icm.has_figo
+                    AND NOT icm.has_dx
+                    AND NOT icm.has_topo THEN 6
+                    ELSE 7
+                END,
+                COALESCE(dx.encounter_id, 0)
+        ) AS rn_first,
+        COALESCE(icm.has_dx, FALSE) AS has_dx,
+        COALESCE(icm.has_topo, FALSE) AS has_topo,
+        COALESCE(icm.has_figo, FALSE) AS has_figo
+    FROM
+        diagnosis dx
+        INNER JOIN (
+            SELECT
+                patient_id,
+                encounter_id,
+                form_field_path,
+                date_recorded
+            FROM
+                "05_initial_consultation"
+        ) ic ON dx.encounter_id = ic.encounter_id
+        AND dx.reference_form_field_path = ic.form_field_path
+        LEFT JOIN initial_confirmed_malignancy icm ON dx.encounter_id = icm.encounter_id
+    WHERE
+        dx.diagnosis = 'Confirmed malignancy'
+        AND ic.date_recorded IS NOT NULL
+),
+-- The initial_first CTE extracts the confirmed cancer diagnosis data from the first initial consultation form where a confirmed diagnosis was reported.
+initial_first AS (
+    SELECT 
+        * 
+    FROM initial_dx_ranked
+    WHERE rn_first = 1
+),
+-- The hist_last CTE extracts the confirmed cancer diagnosis data from the last time a confirmed cancer diagnosis was reported in the histo tab.
+histo_last AS (
+    SELECT 
+        * 
+    FROM ranked_confirmed
+    WHERE rn_last_type = 1 AND visit_type = 'Histopathology result'
+),
+-- The subsequent_confirmed_malignancy CTE aggregates all confirmed cancer diagnosis by subsequent consultation form, listing the cancer diagnosis and FIGO staging for each location.  
+subsequent_confirmed_malignancy AS (
+    SELECT
+        patient_id,
+        encounter_id,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                topography_of_the_tumour_confirmed,
+                confirmed_malignancy_diagnosis
+            ),
+            ', '
+            ORDER BY
+                topography_of_the_tumour_confirmed
+        ) AS topo_dx,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                topography_of_the_tumour_confirmed,
+                COALESCE(
+                    clinical_figo_staging_for_cancer_of_the_vulva,
+                    clinical_figo_staging_for_cancer_of_the_vagina,
+                    clinical_figo_staging_for_cancer_of_the_cervix,
+                    clinical_figo_staging_for_cancer_of_the_uterus,
+                    clinical_figo_staging_for_cancer_of_the_ovary
+                )
+            ),
+            ', '
+            ORDER BY
+                topography_of_the_tumour_confirmed
+        ) AS topo_stage,
+        BOOL_OR(confirmed_malignancy_diagnosis IS NOT NULL) AS has_dx,
+        BOOL_OR(topography_of_the_tumour_confirmed IS NOT NULL) AS has_topo,
+        BOOL_OR(
+            COALESCE(
+                clinical_figo_staging_for_cancer_of_the_vulva,
+                clinical_figo_staging_for_cancer_of_the_vagina,
+                clinical_figo_staging_for_cancer_of_the_cervix,
+                clinical_figo_staging_for_cancer_of_the_uterus,
+                clinical_figo_staging_for_cancer_of_the_ovary
+            ) IS NOT NULL
+        ) AS has_figo
+    FROM
+        (
+            SELECT
+                patient_id,
+                encounter_id,
+                CASE
+                    WHEN confirmed_malignancy_diagnosis IN (
+                        'Squamous cell carcinoma',
+                        'Adenocarcinoma',
+                        'Adenosquamous carcinoma'
+                    ) THEN confirmed_malignancy_diagnosis
+                    WHEN confirmed_malignancy_diagnosis = 'Other' THEN confirmed_malignancy_diagnosis_other
+                END AS confirmed_malignancy_diagnosis,
+                topography_of_the_tumour_confirmed,
+                clinical_figo_staging_for_cancer_of_the_vulva,
+                clinical_figo_staging_for_cancer_of_the_vagina,
+                clinical_figo_staging_for_cancer_of_the_cervix,
+                clinical_figo_staging_for_cancer_of_the_uterus,
+                clinical_figo_staging_for_cancer_of_the_ovary
+            FROM
+                "07_subsequent_consultation_confirmed_malignancy_details"
+        ) cm
+    GROUP BY
+        patient_id,
+        encounter_id
+),
+-- The subsequent_dx_ranked CTE brings together initial_confirmed_malignancy CTE with initial consultation form date where a confirmed cancer diagnosis was reported.
+subsequent_dx_ranked AS (
+    SELECT
+        dx.patient_id,
+        dx.patient_program_id,
+        dx.encounter_id,
+        sc.date_recorded,
+        scm.topo_dx,
+        scm.topo_stage,
+        ROW_NUMBER() OVER (
+            PARTITION BY dx.patient_id
+            ORDER BY
+                sc.date_recorded DESC,
+                CASE
+                    WHEN scm.has_dx
+                    AND scm.has_topo
+                    AND scm.has_figo THEN 0
+                    WHEN scm.has_dx
+                    AND scm.has_topo
+                    AND NOT scm.has_figo THEN 1
+                    WHEN scm.has_dx
+                    AND scm.has_figo
+                    AND NOT scm.has_topo THEN 2
+                    WHEN scm.has_topo
+                    AND scm.has_figo
+                    AND NOT scm.has_dx THEN 3
+                    WHEN scm.has_dx
+                    AND NOT scm.has_topo
+                    AND NOT scm.has_figo THEN 4
+                    WHEN scm.has_topo
+                    AND NOT scm.has_dx
+                    AND NOT scm.has_figo THEN 5
+                    WHEN scm.has_figo
+                    AND NOT scm.has_dx
+                    AND NOT scm.has_topo THEN 6
+                    ELSE 7
+                END,
+                COALESCE(dx.encounter_id, 0) DESC
+        ) AS rn_last,
+        COALESCE(scm.has_dx, FALSE) AS has_dx,
+        COALESCE(scm.has_topo, FALSE) AS has_topo,
+        COALESCE(scm.has_figo, FALSE) AS has_figo
+    FROM
+        diagnosis dx
+        INNER JOIN (
+            SELECT
+                patient_id,
+                encounter_id,
+                form_field_path,
+                date_recorded
+            FROM
+                "07_subsequent_consultation"
+        ) sc ON dx.encounter_id = sc.encounter_id
+        AND dx.reference_form_field_path = sc.form_field_path
+        LEFT JOIN subsequent_confirmed_malignancy scm ON dx.encounter_id = scm.encounter_id
+    WHERE
+        dx.diagnosis = 'Confirmed malignancy'
+        AND sc.date_recorded IS NOT NULL
+),
+-- The subsequent_last CTE extracts the confirmed cancer diagnosis data from the last subsequent consultation form where a confirmed diagnosis was reported.
+subsequent_last AS (    
+    SELECT 
+        * 
+    FROM subsequent_dx_ranked
+    WHERE rn_last = 1
+),
+-- The first_mdt CTE extracts the first proposed management plan recorded in the first pre-treatment MDT. Treatments are in list format if there is more than one treatment proposed.
+first_mdt AS (
+    SELECT 
+        *
+    FROM (
+        SELECT
+            pmp.patient_id, 
+            ptm.encounter_id, 
+            ptm.date_recorded,
+            string_agg(proposed_management_plan, ', ' ORDER BY proposed_management_plan) AS proposed_management_plan,
+            ROW_NUMBER() OVER (PARTITION BY pmp.patient_id ORDER BY ptm.date_recorded DESC, ptm.encounter_id DESC) AS rn_first
+        FROM proposed_management_plan pmp
+        JOIN "10_pre_treatment_mdt" ptm using(encounter_id)
+        GROUP BY pmp.patient_id, ptm.encounter_id, ptm.date_recorded) mdt_rank
+    WHERE rn_first = 1
+),
+-- The ultrasound CTE aggregates FIGO staging results into a single column and ranks the reports per patient.
+ultrasound AS (
+    SELECT
+        ur.patient_id,
+        ur.encounter_id,
+        ur.date_recorded,
+        STRING_AGG(
+            CONCAT_WS(
+                ' - ',
+                fs.ultrasound_figo_staging_location,
+                COALESCE(
+                    fs.ultrasound_figo_staging_vulva,
+                    fs.ultrasound_figo_staging_vagina,
+                    fs.ultrasound_figo_staging_cervix,
+                    fs.ultrasound_figo_staging_uterus,
+                    fs.ultrasound_figo_staging_ovaries
+                )
+            ),
+            ', '
+            ORDER BY
+                fs.ultrasound_figo_staging_location
+        ) AS uss_topo_stage,
+        CASE
+            WHEN ur.cervix_tumor_longitudinal_diameter_in_mm IS NOT NULL
+            AND ur.cervix_tumor_anteroposterior_ap_diameter_in_mm IS NOT NULL
+            AND ur.cervix_tumor_transversal_diameter_in_mm IS NOT NULL THEN (
+                CONCAT(
+                    ur.cervix_tumor_longitudinal_diameter_in_mm,
+                    'x',
+                    ur.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+                    'x',
+                    ur.cervix_tumor_transversal_diameter_in_mm
+                )
+            )
+        END AS cervix_tumor_size,
+        ROW_NUMBER() OVER (
+            PARTITION BY ur.patient_id
+            ORDER BY
+                ur.date_recorded,
+                ur.encounter_id
+        ) AS rn_first,
+        ROW_NUMBER() OVER (
+            PARTITION BY ur.patient_id
+            ORDER BY
+                ur.date_recorded DESC,
+                ur.encounter_id DESC
+        ) AS rn_last
+    FROM
+        "06_ultrasound_report_figo_staging" fs
+        JOIN "06_ultrasound_report" ur USING(encounter_id)
+    GROUP BY
+        ur.patient_id,
+        ur.encounter_id,
+        ur.date_recorded,
+        ur.cervix_tumor_longitudinal_diameter_in_mm,
+        ur.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+        ur.cervix_tumor_transversal_diameter_in_mm
+),
+-- The first_ultrasound CTE selects just the first ultrasound result.
+first_ultrasound AS (
+    SELECT
+        us.patient_id,
+        us.date_recorded AS us_date,
+        us.cervix_tumor_size,
+        us.uss_topo_stage,
+        fm.date_recorded AS mdt_date
+    FROM
+        ultrasound us
+        LEFT OUTER JOIN first_mdt fm ON us.patient_id = fm.patient_id
+    WHERE
+        us.rn_first = 1
+        AND (us.date_recorded <= fm.date_recorded OR fm.date_recorded IS NULL)
+        AND us.cervix_tumor_size IS NOT NULL
+),
+-- The last_ultrasound CTE extracts the last ultrasounds results and formulates the last reported cervical tumor size as CC (longitudianl) x AP (anteropsoterior) x LL (transversal).
+last_ultrasound AS (
+    SELECT
+        us.patient_id,
+        us.date_recorded AS us_date,
+        us.cervix_tumor_size,
+        us.uss_topo_stage
+    FROM
+        ultrasound us
+    WHERE
+        us.rn_last = 1
+        AND us.cervix_tumor_size IS NOT NULL
+),
+-- The cycle_3_sub CTE finds the first subsequent consultation FIGO stanging recorded after the 3rd chemotherapy cycle.
+cycle_3_sub AS (
+    SELECT
+        patient_id,
+        patient_program_id,
+        encounter_id,
+        cycle_3_date,
+        subsequent_date,
+        topo_stage
+    FROM
+        (
+            SELECT
+                cy3.patient_id,
+                cy3.patient_program_id,
+                cy3.encounter_id,
+                cy3.cycle_3_date,
+                sdr.date_recorded AS subsequent_date,
+                sdr.topo_dx,
+                sdr.topo_stage,
+                ROW_NUMBER() OVER (
+                    PARTITION BY cy3.patient_id
+                    ORDER BY
+                        sdr.date_recorded
+                ) AS rn_first_sub
+            FROM
+                (
+                    SELECT
+                        patient_id,
+                        patient_program_id,
+                        encounter_id,
+                        date_recorded AS cycle_3_date,
+                        cycle_number,
+                        LEAD(date_recorded) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle_date,
+                        LEAD(cycle_number) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle
+                    FROM
+                        "27_chemotherapy_clinical_assessment_and_treatment"
+                ) cy3
+                LEFT OUTER JOIN subsequent_dx_ranked sdr ON cy3.patient_id = sdr.patient_id
+                AND cy3.cycle_3_date < sdr.date_recorded
+                AND (
+                    cy3.next_cycle_date >= sdr.date_recorded
+                    OR cy3.next_cycle_date IS NULL
+                )
+            WHERE
+                cy3.cycle_number = 3
+        ) cy3_frame
+    WHERE
+        rn_first_sub = 1
+),
+-- The cycle_3_uss CTE finds the first ultrasound FIGO staging recorded after the 3rd chemotherapy cycle.
+cycle_3_uss AS (
+    SELECT
+        patient_id,
+        patient_program_id,
+        encounter_id,
+        cycle_3_date,
+        uss_date,
+        uss_topo_stage
+    FROM
+        (
+            SELECT
+                cy3.patient_id,
+                cy3.patient_program_id,
+                cy3.encounter_id,
+                cy3.cycle_3_date,
+                us.date_recorded AS uss_date,
+                us.uss_topo_stage,
+                ROW_NUMBER() OVER (
+                    PARTITION BY cy3.patient_id
+                    ORDER BY
+                        us.date_recorded
+                ) AS rn_first_uss
+            FROM
+                (
+                    SELECT
+                        patient_id,
+                        patient_program_id,
+                        encounter_id,
+                        date_recorded AS cycle_3_date,
+                        cycle_number,
+                        LEAD(date_recorded) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle_date,
+                        LEAD(cycle_number) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle
+                    FROM
+                        "27_chemotherapy_clinical_assessment_and_treatment"
+                ) cy3
+                LEFT OUTER JOIN ultrasound us ON cy3.patient_id = us.patient_id
+                AND cy3.cycle_3_date < us.date_recorded
+                AND (
+                    cy3.next_cycle_date >= us.date_recorded
+                    OR cy3.next_cycle_date IS NULL
+                )
+            WHERE
+                cy3.cycle_number = 3
+        ) cy3_frame
+    WHERE
+        rn_first_uss = 1
+),
+-- The cycle_6_sub CTE finds the first subsequent consultation FIGO stanging recorded after the 6th chemotherapy cycle.
+cycle_6_sub AS (
+    SELECT
+        patient_id,
+        patient_program_id,
+        encounter_id,
+        cycle_6_date,
+        subsequent_date,
+        topo_stage
+    FROM
+        (
+            SELECT
+                cy6.patient_id,
+                cy6.patient_program_id,
+                cy6.encounter_id,
+                cy6.cycle_6_date,
+                sdr.date_recorded AS subsequent_date,
+                sdr.topo_dx,
+                sdr.topo_stage,
+                ROW_NUMBER() OVER (
+                    PARTITION BY cy6.patient_id
+                    ORDER BY
+                        sdr.date_recorded
+                ) AS rn_first_sub
+            FROM
+                (
+                    SELECT
+                        patient_id,
+                        patient_program_id,
+                        encounter_id,
+                        date_recorded AS cycle_6_date,
+                        cycle_number,
+                        LEAD(date_recorded) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle_date,
+                        LEAD(cycle_number) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle
+                    FROM
+                        "27_chemotherapy_clinical_assessment_and_treatment"
+                ) cy6
+                LEFT OUTER JOIN subsequent_dx_ranked sdr ON cy6.patient_id = sdr.patient_id
+                AND cy6.cycle_6_date < sdr.date_recorded
+                AND (
+                    cy6.next_cycle_date >= sdr.date_recorded
+                    OR cy6.next_cycle_date IS NULL
+                )
+            WHERE
+                cy6.cycle_number = 6
+        ) cy6_frame
+    WHERE
+        rn_first_sub = 1
+),
+-- THe cycle_6_uss CTE finds the first ultrasound FIGO staging recorded after the 6th chemotherapy cycle.
+cycle_6_uss AS (
+    SELECT
+        patient_id,
+        patient_program_id,
+        encounter_id,
+        cycle_6_date,
+        uss_date,
+        uss_topo_stage
+    FROM
+        (
+            SELECT
+                cy6.patient_id,
+                cy6.patient_program_id,
+                cy6.encounter_id,
+                cy6.cycle_6_date,
+                us.date_recorded AS uss_date,
+                us.uss_topo_stage,
+                ROW_NUMBER() OVER (
+                    PARTITION BY cy6.patient_id
+                    ORDER BY
+                        us.date_recorded
+                ) AS rn_first_uss
+            FROM
+                (
+                    SELECT
+                        patient_id,
+                        patient_program_id,
+                        encounter_id,
+                        date_recorded AS cycle_6_date,
+                        cycle_number,
+                        LEAD(date_recorded) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle_date,
+                        LEAD(cycle_number) OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_recorded
+                        ) AS next_cycle
+                    FROM
+                        "27_chemotherapy_clinical_assessment_and_treatment"
+                ) cy6
+                LEFT OUTER JOIN ultrasound us ON cy6.patient_id = us.patient_id
+                AND cy6.cycle_6_date < us.date_recorded
+                AND (
+                    cy6.next_cycle_date >= us.date_recorded
+                    OR cy6.next_cycle_date IS NULL
+                )
+            WHERE
+                cy6.cycle_number = 6
+        ) cy6_frame
+    WHERE
+        rn_first_uss = 1
+),
+-- The surgery_figo CTE finds the last reported surgery and extracts the earliest FIGO staging from the subsequent consultation form or histopathology result. Only considers results with a stage recorded.
+surgery_figo AS (
+    SELECT
+        *
+    FROM
+        (
+            SELECT
+                sr.patient_id,
+                sr.encounter_id,
+                sr.form_field_path,
+                sr.date_of_surgery,
+                sr.rn_last_surgery,
+                rc.visit_type,
+                rc.topo_stage,
+                rc.date_recorded,
+                ROW_NUMBER() OVER (
+                    PARTITION BY sr.patient_id
+                    ORDER BY
+                        rc.date_recorded
+                ) AS rn_first_figo
+            FROM
+                (
+                    SELECT
+                        *,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY patient_id
+                            ORDER BY
+                                date_of_surgery DESC
+                        ) AS rn_last_surgery
+                    FROM
+                        (
+                            SELECT
+                                patient_id,
+                                encounter_id,
+                                form_field_path,
+                                date_of_surgery
+                            FROM
+                                "19_cervical_surgical_report"
+                            UNION ALL
+                            SELECT
+                                patient_id,
+                                encounter_id,
+                                form_field_path,
+                                date_of_surgery
+                            FROM
+                                "20_ovary_surgical_report"
+                            UNION ALL
+                            SELECT
+                                patient_id,
+                                encounter_id,
+                                form_field_path,
+                                date_of_surgery
+                            FROM
+                                "21_vulva_surgical_report"
+                        ) su
+                ) sr
+                LEFT OUTER JOIN ranked_confirmed rc ON sr.patient_id = rc.patient_id
+                AND sr.date_of_surgery < rc.date_recorded
+            WHERE
+                rc.has_figo = TRUE
+        ) sr_frame
+    WHERE
+        rn_last_surgery = 1
+        AND rn_first_figo = 1
+),
+-- The last_ecog CTE extracts the last reported ECOG performance status from either the initial or subsequent consultation form.
+last_ecog AS (
+    SELECT
+        DISTINCT ON (patient_id)
+        patient_id,
+        date_recorded,
+        ecog_performance_status
+    FROM (
+        SELECT
+            ic.patient_id,
+            ic.encounter_id,
+            'Initial visit' AS visit_type,
+            ic.form_field_path,
+            ic.date_recorded,
+            ic.ecog_performance_status
+        FROM
+            "05_initial_consultation" ic
+        WHERE ecog_performance_status IS NOT NULL
+        UNION
+        ALL
+        SELECT
+            sc.patient_id,
+            sc.encounter_id,
+            'Subsequent visit' AS visit_type,
+            sc.form_field_path,
+            sc.date_recorded,
+            sc.ecog_performance_status
+        FROM
+            "07_subsequent_consultation" sc
+        WHERE ecog_performance_status IS NOT NULL) ecog
+    ORDER BY patient_id, date_recorded DESC
+),
+-- The last_hb CTE extracts the last reported haemoglobin result reported. If multiple haemoglobin results are reported in a single form, the result is randomly reported.
+last_hb AS (
+        SELECT 
+        DISTINCT ON (mf.patient_id)
+        mf.patient_id,         
+        mf.date_recorded AS visit_date,
+        hb.date_recorded,
+        hb.haemoglobin
+    FROM mdt_frame mf 
+    LEFT OUTER JOIN (
+        SELECT 
+            h.patient_id,
+            l.date_recorded,
+            h.haemoglobin
+        FROM haemoglobin h
+        LEFT OUTER JOIN "03_laboratory" l USING(encounter_id)) hb
+    ON mf.patient_id = hb.patient_id AND mf.date_recorded >= hb.date_recorded
+    ORDER BY mf.patient_id, hb.date_recorded DESC
+),
+-- The last_cr_cl CTE extracts the last reported creatinine clearance test result reported. If multiple CR-CL results are reported in a single form, the result is randomly reported.
+last_cr_cl AS (
+    SELECT 
+        DISTINCT ON (mf.patient_id)
+        mf.patient_id, 
+        mf.date_recorded AS visit_date,
+        cc.date_recorded,
+        cc.creatinine
+    FROM mdt_frame mf 
+    LEFT OUTER JOIN (
+        SELECT 
+            cct.patient_id,
+            l.date_recorded,
+            cct.creatinine
+        FROM creatinine cct
+        LEFT OUTER JOIN "03_laboratory" l USING(encounter_id)) cc
+    ON mf.patient_id = cc.patient_id AND mf.date_recorded >= cc.date_recorded
+    ORDER BY mf.patient_id, cc.date_recorded DESC
+),
+-- THe last_bmi CTE extracts the last reported BMI calculation reported. 
+last_bmi AS (
+    SELECT 
+        DISTINCT ON (mf.patient_id)
+        mf.patient_id,
+        mf.date_recorded AS visit_date,
+        bmi.date_time_recorded,
+        bmi.bmi
+    FROM mdt_frame mf
+    LEFT OUTER JOIN (
+        SELECT 
+            patient_id,
+            date_time_recorded,
+            bmi
+        FROM "02_vital_signs" 
+        WHERE bmi IS NOT NULL) bmi
+    ON mf.patient_id = bmi.patient_id AND mf.date_recorded >= bmi.date_time_recorded::date
+    ORDER BY mf.patient_id, bmi.date_time_recorded DESC
+)
+--**MAIN QUERY**--
+SELECT
+    pi."Patient_Identifier",
+    mf.patient_id, 
+    oi.oncology_id,
+    pdd.age AS current_age,  
+    mf.date_recorded AS last_date_cancer_confirmed,
+    mf.visit_type,
+    mf.topo_dx AS last_topo_dx,
+    mf.topo_stage AS last_topo_stage,
+    lpm.mdt_date AS proposed_mdt_date,
+    fi.topo_dx AS initial_topo_dx,
+    fi.topo_stage AS initial_topo_stage, 
+    hl.topo_dx AS last_histo_topo_dx,
+    hl.topo_stage AS last_histo_topo_stage,
+    sl.topo_dx AS last_sub_topo_dx,
+    sl.topo_stage AS last_sub_topo_stage,
+    fu.uss_topo_stage AS first_uss_topo_stage,
+    fu.cervix_tumor_size AS first_cervical_tumor_size,
+    lu.cervix_tumor_size AS last_cervical_tumor_size,
+    fm.proposed_management_plan AS first_proposed_treatment,
+    c3s.topo_stage AS clinical_topo_stage_post_chemo_cycle3,
+    c3u.uss_topo_stage AS ultrasound_topo_stage_post_chemo_cycle3,
+    c6s.topo_stage AS clinical_topo_stage_post_chemo_cycle6,
+    c6u.uss_topo_stage AS ultrasound_topo_stage_post_chemo_cycle6,
+    GREATEST(c3u.cycle_3_date, c6u.cycle_6_date, c3s.cycle_3_date, c6s.cycle_6_date) AS last_cycle_date,
+    sf.date_of_surgery AS last_surgery_date,
+    sf.topo_stage AS topo_stage_post_surgery,
+    sf.date_recorded AS date_post_surgery_staging,
+    le.ecog_performance_status AS last_ecog,
+    hb.haemoglobin AS last_hb,
+    cc.creatinine AS last_cr,
+    lb.bmi AS last_bmi
+FROM mdt_frame mf 
+LEFT OUTER JOIN patient_identifier pi
+    ON mf.patient_id = pi.patient_id
+LEFT OUTER JOIN person_details_default pdd 
+    ON mf.patient_id = pdd.person_id
+LEFT OUTER JOIN last_proposed_mdt lpm 
+    ON mf.patient_id = lpm.patient_id
+LEFT OUTER JOIN onco_id oi
+    ON mf.patient_id = oi.patient_id
+LEFT OUTER JOIN initial_first fi
+    ON mf.patient_id = fi.patient_id
+LEFT OUTER JOIN histo_last hl
+    ON mf.patient_id = hl.patient_id
+LEFT OUTER JOIN subsequent_last sl
+    ON mf.patient_id = sl.patient_id
+LEFT OUTER JOIN first_ultrasound fu 
+    ON mf.patient_id = fu.patient_id
+LEFT OUTER JOIN last_ultrasound lu
+    ON mf.patient_id = lu.patient_id
+LEFT OUTER JOIN first_mdt fm
+    ON mf.patient_id = fm.patient_id
+LEFT OUTER JOIN cycle_3_sub c3s 
+    ON mf.patient_id = c3s.patient_id
+LEFT OUTER JOIN cycle_3_uss c3u
+    ON mf.patient_id = c3u.patient_id
+LEFT OUTER JOIN cycle_6_sub c6s 
+    ON mf.patient_id = c6s.patient_id
+LEFT OUTER JOIN cycle_6_uss c6u
+    ON mf.patient_id = c6u.patient_id
+LEFT OUTER JOIN surgery_figo sf 
+    ON mf.patient_id = sf.patient_id
+LEFT OUTER JOIN last_ecog le 
+    ON mf.patient_id = le.patient_id
+LEFT OUTER JOIN last_hb hb
+    ON mf.patient_id = hb.patient_id AND mf.date_recorded = hb.visit_date
+LEFT OUTER JOIN last_cr_cl cc
+    ON mf.patient_id = cc.patient_id AND mf.date_recorded = cc.visit_date
+LEFT OUTER JOIN last_bmi lb 
+    ON mf.patient_id = lb.patient_id AND mf.date_recorded = lb.visit_date
+ORDER BY mf.date_recorded DESC;
