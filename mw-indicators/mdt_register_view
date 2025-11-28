@@ -301,6 +301,45 @@ mdt_frame AS (
                 AND mdt.date_recorded >= lc.date_recorded
         )
 ),
+-- The last_proposed_mdt CTE creates a list of all initial and subsequent consultations where MDT was flagged as an appointment needed following the consultation.
+last_proposed_mdt AS (
+    SELECT
+        mf.patient_id, 
+        c.visit_type,
+        mf.date_recorded AS last_result_date,
+        c.date_recorded AS consultation_date,
+        c.mdt_date
+    FROM mdt_frame mf 
+    LEFT OUTER JOIN 
+    (SELECT
+        ic.patient_id,
+        ic.encounter_id,
+        'Initial visit' AS visit_type,
+        ic.form_field_path,
+        ic.date_recorded,
+        ic.mdt_date
+    FROM
+        "05_initial_consultation" ic
+        INNER JOIN appointment_needed an ON ic.encounter_id = an.encounter_id
+        AND ic.form_field_path = an.reference_form_field_path
+    WHERE
+        an.appointment_needed = 'MDT' AND ic.mdt_date IS NOT NULL
+    UNION ALL
+    SELECT
+        sc.patient_id,
+        sc.encounter_id,
+        'Subsequent visit' AS visit_type,
+        sc.form_field_path,
+        sc.date_recorded,
+        sc.mdt_date
+    FROM
+        "07_subsequent_consultation" sc
+        INNER JOIN appointment_needed an ON sc.encounter_id = an.encounter_id
+        AND sc.form_field_path = an.reference_form_field_path
+    WHERE
+        an.appointment_needed = 'MDT' AND sc.mdt_date IS NOT NULL) c
+    ON mf.patient_id = c.patient_id AND mf.date_recorded <= c.mdt_date
+),
 -- The onco_id CTE extracts the oncology ID from the Chemo baseline assessment, if present, and then the patient history if not present in the chemo baseline assessment. 
 onco_id AS (
     SELECT
@@ -612,6 +651,22 @@ subsequent_last AS (
     FROM subsequent_dx_ranked
     WHERE rn_last = 1
 ),
+-- The first_mdt CTE extracts the first proposed management plan recorded in the first pre-treatment MDT. Treatments are in list format if there is more than one treatment proposed.
+first_mdt AS (
+    SELECT 
+        *
+    FROM (
+        SELECT
+            pmp.patient_id, 
+            ptm.encounter_id, 
+            ptm.date_recorded,
+            string_agg(proposed_management_plan, ', ' ORDER BY proposed_management_plan) AS proposed_management_plan,
+            ROW_NUMBER() OVER (PARTITION BY pmp.patient_id ORDER BY ptm.date_recorded DESC, ptm.encounter_id DESC) AS rn_first
+        FROM proposed_management_plan pmp
+        JOIN "10_pre_treatment_mdt" ptm using(encounter_id)
+        GROUP BY pmp.patient_id, ptm.encounter_id, ptm.date_recorded) mdt_rank
+    WHERE rn_first = 1
+),
 -- The ultrasound CTE aggregates FIGO staging results into a single column and ranks the reports per patient.
 ultrasound AS (
     SELECT
@@ -634,77 +689,70 @@ ultrasound AS (
             ORDER BY
                 fs.ultrasound_figo_staging_location
         ) AS uss_topo_stage,
+        CASE
+            WHEN ur.cervix_tumor_longitudinal_diameter_in_mm IS NOT NULL
+            AND ur.cervix_tumor_anteroposterior_ap_diameter_in_mm IS NOT NULL
+            AND ur.cervix_tumor_transversal_diameter_in_mm IS NOT NULL THEN (
+                CONCAT(
+                    ur.cervix_tumor_longitudinal_diameter_in_mm,
+                    'x',
+                    ur.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+                    'x',
+                    ur.cervix_tumor_transversal_diameter_in_mm
+                )
+            )
+        END AS cervix_tumor_size,
         ROW_NUMBER() OVER (
             PARTITION BY ur.patient_id
             ORDER BY
                 ur.date_recorded,
                 ur.encounter_id
-        ) AS rn_first
+        ) AS rn_first,
+        ROW_NUMBER() OVER (
+            PARTITION BY ur.patient_id
+            ORDER BY
+                ur.date_recorded DESC,
+                ur.encounter_id DESC
+        ) AS rn_last
     FROM
         "06_ultrasound_report_figo_staging" fs
         JOIN "06_ultrasound_report" ur USING(encounter_id)
     GROUP BY
         ur.patient_id,
         ur.encounter_id,
-        ur.date_recorded
+        ur.date_recorded,
+        ur.cervix_tumor_longitudinal_diameter_in_mm,
+        ur.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+        ur.cervix_tumor_transversal_diameter_in_mm
 ),
 -- The first_ultrasound CTE selects just the first ultrasound result.
 first_ultrasound AS (
     SELECT
-        *
-    FROM ultrasound
+        us.patient_id,
+        us.date_recorded AS us_date,
+        us.cervix_tumor_size,
+        us.uss_topo_stage,
+        fm.date_recorded AS mdt_date
+    FROM
+        ultrasound us
+        LEFT OUTER JOIN first_mdt fm ON us.patient_id = fm.patient_id
     WHERE
-        rn_first = 1
+        us.rn_first = 1
+        AND (us.date_recorded <= fm.date_recorded OR fm.date_recorded IS NULL)
+        AND us.cervix_tumor_size IS NOT NULL
 ),
 -- The last_ultrasound CTE extracts the last ultrasounds results and formulates the last reported cervical tumor size as CC (longitudianl) x AP (anteropsoterior) x LL (transversal).
 last_ultrasound AS (
     SELECT
-        DISTINCT ON (mf.patient_id) mf.patient_id,
-        mf.date_recorded AS visit_date,
-        sz.date_recorded,
-        sz.cervix_tumor_size
+        us.patient_id,
+        us.date_recorded AS us_date,
+        us.cervix_tumor_size,
+        us.uss_topo_stage
     FROM
-        mdt_frame mf
-        LEFT OUTER JOIN (
-            SELECT
-                patient_id,
-                encounter_id,
-                date_recorded,
-                CONCAT(
-                    cervix_tumor_longitudinal_diameter_in_mm,
-                    'x',
-                    cervix_tumor_anteroposterior_ap_diameter_in_mm,
-                    'x',
-                    cervix_tumor_transversal_diameter_in_mm
-                ) AS cervix_tumor_size
-            FROM
-                "06_ultrasound_report"
-            WHERE
-                cervix_tumor_longitudinal_diameter_in_mm IS NOT NULL
-                AND cervix_tumor_anteroposterior_ap_diameter_in_mm IS NOT NULL
-                AND cervix_tumor_transversal_diameter_in_mm IS NOT NULL
-        ) sz ON mf.patient_id = sz.patient_id
-        AND mf.date_recorded = sz.date_recorded
-    ORDER BY
-        mf.patient_id,
-        sz.date_recorded DESC
-        NULLS LAST
-),
--- The first_mdt CTE extracts the first proposed management plan recorded in the first pre-treatment MDT. Treatments are in list format if there is more than one treatment proposed.
-first_mdt AS (
-    SELECT 
-        *
-    FROM (
-        SELECT
-            pmp.patient_id, 
-            ptm.encounter_id, 
-            ptm.date_recorded,
-            string_agg(proposed_management_plan, ', ' ORDER BY proposed_management_plan) AS proposed_management_plan,
-            ROW_NUMBER() OVER (PARTITION BY pmp.patient_id ORDER BY ptm.date_recorded DESC, ptm.encounter_id DESC) AS rn_first
-        FROM proposed_management_plan pmp
-        JOIN "10_pre_treatment_mdt" ptm using(encounter_id)
-        GROUP BY pmp.patient_id, ptm.encounter_id, ptm.date_recorded) mdt_rank
-    WHERE rn_first = 1
+        ultrasound us
+    WHERE
+        us.rn_last = 1
+        AND us.cervix_tumor_size IS NOT NULL
 ),
 -- The cycle_3_sub CTE finds the first subsequent consultation FIGO stanging recorded after the 3rd chemotherapy cycle.
 cycle_3_sub AS (
@@ -1055,14 +1103,14 @@ last_cr_cl AS (
         mf.patient_id, 
         mf.date_recorded AS visit_date,
         cc.date_recorded,
-        cc.creatinine_clearance_test
+        cc.creatinine
     FROM mdt_frame mf 
     LEFT OUTER JOIN (
         SELECT 
             cct.patient_id,
             l.date_recorded,
-            cct.creatinine_clearance_test
-        FROM creatinine_clearance_test cct
+            cct.creatinine
+        FROM creatinine cct
         LEFT OUTER JOIN "03_laboratory" l USING(encounter_id)) cc
     ON mf.patient_id = cc.patient_id AND mf.date_recorded >= cc.date_recorded
     ORDER BY mf.patient_id, cc.date_recorded DESC
@@ -1083,7 +1131,7 @@ last_bmi AS (
             bmi
         FROM "02_vital_signs" 
         WHERE bmi IS NOT NULL) bmi
-    ON mf.patient_id = bmi.patient_id AND mf.date_recorded >= bmi.date_time_recorded
+    ON mf.patient_id = bmi.patient_id AND mf.date_recorded >= bmi.date_time_recorded::date
     ORDER BY mf.patient_id, bmi.date_time_recorded DESC
 )
 --**MAIN QUERY**--
@@ -1096,7 +1144,7 @@ SELECT
     mf.visit_type,
     mf.topo_dx AS last_topo_dx,
     mf.topo_stage AS last_topo_stage,
-    mf.mdt_date AS proposed_mdt_date,
+    lpm.mdt_date AS proposed_mdt_date,
     fi.topo_dx AS initial_topo_dx,
     fi.topo_stage AS initial_topo_stage, 
     hl.topo_dx AS last_histo_topo_dx,
@@ -1104,6 +1152,7 @@ SELECT
     sl.topo_dx AS last_sub_topo_dx,
     sl.topo_stage AS last_sub_topo_stage,
     fu.uss_topo_stage AS first_uss_topo_stage,
+    fu.cervix_tumor_size AS first_cervical_tumor_size,
     lu.cervix_tumor_size AS last_cervical_tumor_size,
     fm.proposed_management_plan AS first_proposed_treatment,
     c3s.topo_stage AS clinical_topo_stage_post_chemo_cycle3,
@@ -1116,13 +1165,15 @@ SELECT
     sf.date_recorded AS date_post_surgery_staging,
     le.ecog_performance_status AS last_ecog,
     hb.haemoglobin AS last_hb,
-    cc.creatinine_clearance_test AS last_cr_cl,
+    cc.creatinine AS last_cr,
     lb.bmi AS last_bmi
 FROM mdt_frame mf 
 LEFT OUTER JOIN patient_identifier pi
     ON mf.patient_id = pi.patient_id
 LEFT OUTER JOIN person_details_default pdd 
     ON mf.patient_id = pdd.person_id
+LEFT OUTER JOIN last_proposed_mdt lpm 
+    ON mf.patient_id = lpm.patient_id
 LEFT OUTER JOIN onco_id oi
     ON mf.patient_id = oi.patient_id
 LEFT OUTER JOIN initial_first fi
@@ -1134,7 +1185,7 @@ LEFT OUTER JOIN subsequent_last sl
 LEFT OUTER JOIN first_ultrasound fu 
     ON mf.patient_id = fu.patient_id
 LEFT OUTER JOIN last_ultrasound lu
-    ON mf.patient_id = lu.patient_id AND mf.date_recorded = lu.visit_date
+    ON mf.patient_id = lu.patient_id
 LEFT OUTER JOIN first_mdt fm
     ON mf.patient_id = fm.patient_id
 LEFT OUTER JOIN cycle_3_sub c3s 
