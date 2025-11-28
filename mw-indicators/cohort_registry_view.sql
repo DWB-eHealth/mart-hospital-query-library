@@ -114,11 +114,11 @@ patient_history AS (
 		patient_program_id,
 		date_recorded AS ph_date,
 		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_recorded DESC) AS row,
-		via_screening_id,
 		reason_for_referral,
-		referral_facility AS referral_facility_type, 
+		referral_facility, 
 		CASE WHEN msf_via_centre_name IS NOT NULL THEN msf_via_centre_name WHEN ngo_s_via_centre_name IS NOT NULL AND ngo_s_via_centre_name != 'Other' THEN ngo_s_via_centre_name WHEN ngo_s_via_centre_name IS NOT NULL AND ngo_s_via_centre_name = 'Other' THEN ngo_s_via_centre_name_other WHEN moh_health_facility_name IS NOT NULL AND moh_health_facility_name != 'Other' THEN moh_health_facility_name WHEN moh_health_facility_name IS NOT NULL AND moh_health_facility_name = 'Other' THEN moh_health_facility_name_other ELSE NULL END AS referral_facility_name,
 		number_of_previous_pregnancies_including_current_if_applica AS pregnancies,
+		hpv_status,
 		smoker
 	FROM "01_patient_history"),
 vital_signs AS (
@@ -144,15 +144,6 @@ hiv_result AS (
 		on_antiretroviral_therapy,
 		cd4_count
 	FROM hiv_test),
-hpv_result AS (
-	SELECT
-		patient_id,
-		encounter_id,
-		patient_program_id,
-		date_recorded,
-		ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY date_recorded DESC) AS row,
-		hpv_status
-	FROM "01_patient_history" WHERE hpv_status IS NOT NULL),
 social_assessment_edu AS (
 	SELECT
 		patient_id,
@@ -327,7 +318,6 @@ SELECT
 	LOWER(pad.address3) AS district, 
 	LOWER(pad.address2) AS region, 
 	LOWER(pad.address1) AS country,
-	LOWER(pad.address5) AS nearest_health_facility,
 	sae.patient_education_level,
 	rd.date_created::date AS registration_date,
 	pf.date_enrolled AS enrollment_date,
@@ -335,17 +325,16 @@ SELECT
 	AGE(CURRENT_DATE, pf.date_enrolled) AS time_since_enrollment,
 	(DATE_PART('year', AGE(CURRENT_DATE, pf.date_enrolled)))*12+DATE_PART('Month', AGE(CURRENT_DATE, pf.date_enrolled)) AS months_since_enrollment,
 	DATE_PART('year', AGE(CURRENT_DATE, pf.date_enrolled)) AS years_since_enrollment,
-	ph.via_screening_id,
 	ph.reason_for_referral,
-	ph.referral_facility_type,
+	ph.referral_facility,
 	ph.referral_facility_name,
 	ph.pregnancies,
-	hpv.hpv_status,
+	ph.hpv_status,
 	ph.smoker,
 	vs.bmi,
-	hiv.hiv_test,
-	hiv.on_antiretroviral_therapy,
-	hiv.cd4_count,
+	hr.hiv_test,
+	hr.on_antiretroviral_therapy,
+	hr.cd4_count,
 	ic.initial_consultation_date,
 	ic.initial_ecog_performance_status,
 	ic.initial_confirmed_malignancy,
@@ -414,8 +403,7 @@ LEFT JOIN subsequent_consultation_status scs ON ptid.patient_id = scs.patient_id
 LEFT JOIN subsequent_consultation_disclosure scd ON ptid.patient_id = scd.patient_id
 LEFT JOIN patient_history ph ON ptid.patient_id = ph.patient_id 
 LEFT JOIN vital_signs vs ON ptid.patient_id = vs.patient_id
-LEFT JOIN hpv_result hpv ON ptid.patient_id = hpv.patient_id
-LEFT JOIN hiv_result hiv ON ptid.patient_id = hiv.patient_id 
+LEFT JOIN hiv_result hr ON ptid.patient_id = hr.patient_id 
 LEFT JOIN social_assessment_edu sae ON ptid.patient_id = sae.patient_id 
 LEFT JOIN social_assessment_post_disclosure sapd ON ptid.patient_id = sapd.patient_id
 LEFT JOIN last_visit lv ON ptid.patient_id = lv.patient_id
@@ -443,8 +431,7 @@ WHERE (ptmdt.row = 1 OR ptmdt.row IS NULL) AND
 	(scs.row = 1 OR scs.row IS NULL) AND 
 	(ph.row = 1 OR ph.row IS NULL) AND 
 	(vs.row = 1 OR vs.row IS NULL) AND 
-	(hpv.row = 1 OR hpv.row IS NULL) AND 
-	(hiv.row = 1 OR hiv.row IS NULL) AND 
+	(hr.row = 1 OR hr.row IS NULL) AND 
 	(sae.row = 1 OR sae.row IS NULL) AND 
 	(pe.row = 1 OR pe.row IS NULL) AND 
 	(lv.row = 1 OR lv.row IS NULL) AND 
