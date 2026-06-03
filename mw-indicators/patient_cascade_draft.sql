@@ -170,6 +170,17 @@ nac_3_cycles AS (
         cycle_number
     FROM nac_3_cycles_candidates
     WHERE rn = 1),
+
+/*
+ * nact_response_candidates
+ * Priority 1 : Follow Up MDT after cycle 3 with treatment_type = 'Chemotherapy follow up'
+ *              AND a chemo response value filled in
+ * Priority 2 : Subsequent Consultation after cycle 3 with a chemo response value filled in
+* Tie-breaking rules:
+ *   - Earlier date wins
+ *   - Same date → source priority 1 (Follow Up MDT) wins over 2 (Subsequent Consultation)
+ *   - Same date + same source → LATEST encounter_id wins (most recent record of that day)
+ */
 nact_response_candidates AS (
     SELECT
         pc.encounter_id AS premdt_encounter_id,
@@ -184,6 +195,12 @@ nact_response_candidates AS (
       ON fumdt.patient_id = pc.patient_id
      AND fumdt.date_recorded > nac.date_NAC_3_cycles
      AND fumdt.treatment_type = 'Chemotherapy follow up'
+     AND fumdt.chemotherapy_response IN (
+         'Complete response',
+         '>= 30 percentage partial response',
+         '<= 30 percentage partial response',
+         'Stable disease',
+         'Progressive disease')
     UNION ALL
     SELECT
         pc.encounter_id AS premdt_encounter_id,
@@ -197,7 +214,12 @@ nact_response_candidates AS (
     JOIN "07_subsequent_consultation" sc
       ON sc.patient_id = pc.patient_id
      AND sc.date_recorded > nac.date_NAC_3_cycles
-     AND sc.chemotherapy_response = 'Completed'),
+     AND sc.chemotherapy_response IN (
+         'Complete response',
+         '>= 30 percentage partial response',
+         '<= 30 percentage partial response',
+         'Stable disease',
+         'Progressive disease')),
 nact_response_ranked AS (
     SELECT
         premdt_encounter_id,
@@ -205,7 +227,10 @@ nact_response_ranked AS (
         chemotherapy_response,
         ROW_NUMBER() OVER (
             PARTITION BY premdt_encounter_id
-            ORDER BY date_NACT_response, source_priority, source_encounter_id
+            ORDER BY
+                date_NACT_response,       -- earliest date first
+                source_priority,           -- Follow Up MDT before Subsequent Consultation
+                source_encounter_id DESC   -- same date + same source → latest encounter wins
         ) AS rn
     FROM nact_response_candidates),
 nact_response AS (
@@ -214,6 +239,33 @@ nact_response AS (
         date_NACT_response,
         chemotherapy_response
     FROM nact_response_ranked
+    WHERE rn = 1),
+
+palliative_after_nac3_candidates AS (
+    SELECT
+        pc.encounter_id AS premdt_encounter_id,
+        fum.encounter_id AS palliative_encounter_id,
+        fum.date_recorded AS date_palliative_referred,
+        ROW_NUMBER() OVER (
+            PARTITION BY pc.encounter_id
+            ORDER BY fum.date_recorded, fum.encounter_id
+        ) AS rn
+    FROM premdt_first pc
+    JOIN nac_3_cycles nac
+      ON nac.premdt_encounter_id = pc.encounter_id
+    JOIN "11_follow_up_mdt" fum
+      ON fum.patient_id = pc.patient_id
+     AND fum.date_recorded > nac.date_NAC_3_cycles
+    JOIN proposed_management_plan pmp
+      ON pmp.encounter_id = fum.encounter_id
+     AND pmp.reference_form_field_path = fum.form_field_path
+     AND pmp.proposed_management_plan = 'Palliative Care'),
+palliative_after_nac3 AS (
+    SELECT
+        premdt_encounter_id,
+        palliative_encounter_id,
+        date_palliative_referred
+    FROM palliative_after_nac3_candidates
     WHERE rn = 1)
 
 /*Main query*/
@@ -247,7 +299,12 @@ SELECT
     nac.date_NAC_3_cycles,
     nac.cycle_number,
     nr.date_NACT_response,
-    nr.chemotherapy_response
+    nr.chemotherapy_response,
+    pan.date_palliative_referred AS date_palliative_referred_after_NAC3,
+    CASE WHEN pan.date_palliative_referred IS NOT NULL THEN 'Yes' ELSE NULL END
+        AS referred_to_palliative_after_NAC3,
+    CASE WHEN pan.date_palliative_referred IS NOT NULL THEN 1 ELSE 0 END
+        AS palliative_referred_after_NAC3_count
 FROM premdt_first pc
 LEFT JOIN topography_list tl
     ON tl.encounter_id = pc.encounter_id
@@ -266,4 +323,6 @@ LEFT JOIN chemoradiation_post_surgery crps
 LEFT JOIN nac_3_cycles nac
     ON nac.premdt_encounter_id = pc.encounter_id
 LEFT JOIN nact_response nr
-    ON nr.premdt_encounter_id = pc.encounter_id;
+    ON nr.premdt_encounter_id = pc.encounter_id
+LEFT JOIN palliative_after_nac3 pan
+    ON pan.premdt_encounter_id = pc.encounter_id;
