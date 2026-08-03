@@ -287,16 +287,6 @@ palliative_after_nac3 AS (
     FROM palliative_after_nac3_candidates
     WHERE rn = 1),
 
-/* =====================================================================
-   ================  NEW ADDITIONS : indicators 2.x & 3.x  =============
-   =====================================================================
-   Everything below reuses four "event source" CTEs so the same logic
-   isn't rewritten a dozen times, then a set of small "first event after
-   anchor X" pickers. Each picker returns at most one row per patient.
-   ===================================================================== */
-
-/* ---- Shared event sources ------------------------------------------ */
-
 /* Any chemotherapy-response assessment, from Follow-up MDT (priority 1)
    or Subsequent Consultation (priority 2). Same value list & tie-break
    philosophy as the existing nact_response logic above.                */
