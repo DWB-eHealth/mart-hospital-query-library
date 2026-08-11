@@ -1,6 +1,6 @@
 /* =====================================================================
    PATIENT CASCADE BY FIGO STAGE — cervical cancer (Malawi EA / DHIS2)
- /
+ */
 
 WITH premdt_confirmed AS (
     SELECT
