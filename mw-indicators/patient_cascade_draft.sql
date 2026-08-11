@@ -1,13 +1,6 @@
 /* =====================================================================
-   PATIENT CASCADE BY FIGO STAGE
-   One row = one patient, anchored on their FIRST Pre-MDT with a
-   confirmed malignancy. Every downstream column is an event found on
-   that patient's timeline AFTER the relevant anchor date.
-
-   Cascade counts (indicators 1.x / 2.x / 3.x) are obtained by FILTERING
-   this row-level output 
-
-      ===================================================================== */
+   PATIENT CASCADE BY FIGO STAGE — cervical cancer (Malawi EA / DHIS2)
+ /
 
 WITH premdt_confirmed AS (
     SELECT
@@ -104,13 +97,13 @@ upfront_surgery_candidates AS (
     JOIN "19_cervical_surgical_report" csr
       ON csr.patient_id = pc.patient_id
      AND csr.date_of_surgery > pc.premdt_date
-    /* Optional refinement to make this TRULY "upfront" (no chemo first),
-       per spec note "No chemotherapy form is completed before surgery":
+    /* STRICT "upfront" = surgery is the first treatment (no chemo before it),
+       per spec note "No chemotherapy form is completed before surgery". */
      AND NOT EXISTS (
          SELECT 1 FROM "27_chemotherapy_clinical_assessment_and_treatment" ch
          WHERE ch.patient_id = pc.patient_id
            AND ch.date_recorded > pc.premdt_date
-           AND ch.date_recorded < csr.date_of_surgery)                     */
+           AND ch.date_recorded < csr.date_of_surgery)
     ),
 upfront_surgery AS (
     SELECT
@@ -287,6 +280,16 @@ palliative_after_nac3 AS (
     FROM palliative_after_nac3_candidates
     WHERE rn = 1),
 
+/* =====================================================================
+   ================  NEW ADDITIONS : indicators 2.x & 3.x  =============
+   =====================================================================
+   Everything below reuses four "event source" CTEs so the same logic
+   isn't rewritten a dozen times, then a set of small "first event after
+   anchor X" pickers. Each picker returns at most one row per patient.
+   ===================================================================== */
+
+/* ---- Shared event sources ------------------------------------------ */
+
 /* Any chemotherapy-response assessment, from Follow-up MDT (priority 1)
    or Subsequent Consultation (priority 2). Same value list & tie-break
    philosophy as the existing nact_response logic above.                */
@@ -380,7 +383,7 @@ ic_3_cycles_candidates AS (
     JOIN "27_chemotherapy_clinical_assessment_and_treatment" chemo
       ON chemo.patient_id = pc.patient_id
      AND chemo.date_recorded > pc.premdt_date
-     AND chemo.type_of_chemotherapy = 'Induction chemotherapy'  
+     AND chemo.type_of_chemotherapy = 'Induction chemotherapy'  -- verified against data (lowercase c)
      AND chemo.cycle_number >= 3),
 ic_3_cycles AS (
     SELECT premdt_encounter_id, date_ic_3_cycles, ic_cycle_number
@@ -400,7 +403,7 @@ ic_more_than_3_candidates AS (
     JOIN "27_chemotherapy_clinical_assessment_and_treatment" chemo
       ON chemo.patient_id = pc.patient_id
      AND chemo.date_recorded > pc.premdt_date
-     AND chemo.type_of_chemotherapy = 'Induction chemotherapy'  
+     AND chemo.type_of_chemotherapy = 'Induction chemotherapy'  -- verified against data (lowercase c)
      AND chemo.cycle_number > 3),
 ic_more_than_3 AS (
     SELECT premdt_encounter_id, date_ic_last_cycle, ic_last_cycle_number
