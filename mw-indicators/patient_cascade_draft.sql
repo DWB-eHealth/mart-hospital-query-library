@@ -380,7 +380,7 @@ ic_3_cycles_candidates AS (
     JOIN "27_chemotherapy_clinical_assessment_and_treatment" chemo
       ON chemo.patient_id = pc.patient_id
      AND chemo.date_recorded > pc.premdt_date
-     AND chemo.type_of_chemotherapy = 'Induction Chemotherapy'  -- <<< VERIFY exact concept string
+     AND chemo.type_of_chemotherapy = 'Induction chemotherapy'  
      AND chemo.cycle_number >= 3),
 ic_3_cycles AS (
     SELECT premdt_encounter_id, date_ic_3_cycles, ic_cycle_number
@@ -400,7 +400,7 @@ ic_more_than_3_candidates AS (
     JOIN "27_chemotherapy_clinical_assessment_and_treatment" chemo
       ON chemo.patient_id = pc.patient_id
      AND chemo.date_recorded > pc.premdt_date
-     AND chemo.type_of_chemotherapy = 'Induction Chemotherapy'  -- <<< VERIFY exact concept string
+     AND chemo.type_of_chemotherapy = 'Induction chemotherapy'  
      AND chemo.cycle_number > 3),
 ic_more_than_3 AS (
     SELECT premdt_encounter_id, date_ic_last_cycle, ic_last_cycle_number
