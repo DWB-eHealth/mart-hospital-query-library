@@ -1,6 +1,6 @@
 /* =====================================================================
    PATIENT CASCADE BY FIGO STAGE — cervical cancer (Malawi EA / DHIS2)
- /
+    ===================================================================== */
 
 WITH premdt_confirmed AS (
     SELECT
@@ -88,6 +88,7 @@ next_fumdt AS (
 upfront_surgery_candidates AS (
     SELECT
         pc.encounter_id AS premdt_encounter_id,
+        csr.encounter_id AS upfront_surgery_encounter_id,
         csr.date_of_surgery AS date_upfront_cervical_surgery,
         ROW_NUMBER() OVER (
             PARTITION BY pc.encounter_id
@@ -97,6 +98,12 @@ upfront_surgery_candidates AS (
     JOIN "19_cervical_surgical_report" csr
       ON csr.patient_id = pc.patient_id
      AND csr.date_of_surgery > pc.premdt_date
+     AND EXISTS (
+         SELECT 1
+         FROM procedure_performed pp
+         WHERE pp.encounter_id = csr.encounter_id
+           AND pp.reference_form_field_path = '19 Cervical Surgical Report'
+           AND LOWER(pp.procedure_performed) LIKE '%hysterectomy%')
     /* STRICT "upfront" = surgery is the first treatment (no chemo before it),
        per spec note "No chemotherapy form is completed before surgery". */
      AND NOT EXISTS (
@@ -108,9 +115,23 @@ upfront_surgery_candidates AS (
 upfront_surgery AS (
     SELECT
         premdt_encounter_id,
+        upfront_surgery_encounter_id,
         date_upfront_cervical_surgery
     FROM upfront_surgery_candidates
     WHERE rn = 1),
+upfront_surgery_procedure_list AS (
+    SELECT
+        us.premdt_encounter_id,
+        STRING_AGG(
+            DISTINCT pp.procedure_performed,
+            ', '
+            ORDER BY pp.procedure_performed
+        ) AS upfront_surgery_procedures
+    FROM upfront_surgery us
+    JOIN procedure_performed pp
+      ON pp.encounter_id = us.upfront_surgery_encounter_id
+     AND pp.reference_form_field_path = '19 Cervical Surgical Report'
+    GROUP BY us.premdt_encounter_id),
 fumdt_post_surgery_candidates AS (
     SELECT
         pc.encounter_id AS premdt_encounter_id,
@@ -667,6 +688,7 @@ SELECT
     spf.surgical_procedure_proposed,                        -- Pre-MDT proposed surgery
     nf.date_next_fumdt,
     us.date_upfront_cervical_surgery,                       -- 1.1
+    usp.upfront_surgery_procedures,
     CASE
         WHEN us.date_upfront_cervical_surgery IS NOT NULL
          AND nf.date_next_fumdt IS NOT NULL
@@ -796,6 +818,8 @@ LEFT JOIN next_fumdt nf
     ON nf.premdt_encounter_id = pc.encounter_id
 LEFT JOIN upfront_surgery us
     ON us.premdt_encounter_id = pc.encounter_id
+LEFT JOIN upfront_surgery_procedure_list usp
+    ON usp.premdt_encounter_id = pc.encounter_id
 LEFT JOIN fumdt_post_surgery fps
     ON fps.premdt_encounter_id = pc.encounter_id
 LEFT JOIN radiation_therapy_flag rtf
