@@ -46,7 +46,7 @@ follow_up_mdt_confirmed_surgical AS (
                 'Yes' AS has_confirmed_malignancy,
                 NULL AS vulva_figo,
                 NULL AS vagina_figo,
-                NULL AS cervix_figo,
+                fum.post_operative_figo_staging_for_cancer_of_the_cervix AS cervix_figo,
                 NULL AS uterus_figo,
                 NULL AS ovary_figo
         FROM "11_follow_up_mdt" fum
@@ -74,6 +74,31 @@ confirmed_mdt_first AS (
                     SELECT 1
                     FROM pre_mdt_confirmed ptm
                     WHERE ptm.patient_id = fum.patient_id)),
+latest_ultrasound_candidates AS (
+    SELECT
+        pc.encounter_id AS confirmed_mdt_encounter_id,
+        us.date_recorded,
+        us.cervix_tumor_identification,
+        us.cervix_tumor_longitudinal_diameter_in_mm,
+        us.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+        us.cervix_tumor_transversal_diameter_in_mm,
+        ROW_NUMBER() OVER (
+            PARTITION BY pc.encounter_id
+            ORDER BY us.date_recorded DESC, us.encounter_id DESC
+        ) AS rn
+    FROM confirmed_mdt_first pc
+    JOIN "06_ultrasound_report" us
+      ON us.patient_id = pc.patient_id
+     AND us.date_recorded < pc.confirmed_mdt_date),
+latest_ultrasound AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        cervix_tumor_identification,
+        cervix_tumor_longitudinal_diameter_in_mm,
+        cervix_tumor_anteroposterior_ap_diameter_in_mm,
+        cervix_tumor_transversal_diameter_in_mm
+    FROM latest_ultrasound_candidates
+    WHERE rn = 1),
 topography_dedup AS (
     SELECT DISTINCT
         encounter_id,
@@ -721,12 +746,33 @@ SELECT
     pc.cervix_figo,
     pc.uterus_figo,
     pc.ovary_figo,
+    CONCAT_WS(
+        ' X ',
+        lu.cervix_tumor_longitudinal_diameter_in_mm,
+        lu.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+        lu.cervix_tumor_transversal_diameter_in_mm
+    ) AS cervix_tumor_size_longitudinal_x_ap_x_transverse_mm,
 
     /* FIGO grouping helper for the cervix cascade (verify stored strings) */
     CASE
         WHEN pc.cervix_figo IN ('IB1','IB2','IIA1')            THEN 'Group 1 (IB1/IB2/IIA1)'
         WHEN pc.cervix_figo IN ('IB3','IIA2','IIB')            THEN 'Group 2 (IB3/IIA2/IIB)'
-        WHEN pc.cervix_figo IN ('IIIA','IIIB','IIIC1','IIIC2') THEN 'Group 3 (IIIA/IIIB/IIIC)'
+        WHEN pc.cervix_figo IN ('IIIA','IIIB','IIIC2')
+            THEN 'Group 3.1 (IIIA/IIIB/IIIC1 >2cm/IIIC2)'
+        WHEN pc.cervix_figo = 'IIIC1'
+         AND lu.cervix_tumor_identification = 'Yes'
+         AND GREATEST(
+             lu.cervix_tumor_longitudinal_diameter_in_mm,
+             lu.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+             lu.cervix_tumor_transversal_diameter_in_mm) > 20
+            THEN 'Group 3.1 (IIIA/IIIB/IIIC1 >2cm/IIIC2)'
+        WHEN pc.cervix_figo = 'IIIC1'
+         AND lu.cervix_tumor_identification = 'Yes'
+         AND GREATEST(
+             lu.cervix_tumor_longitudinal_diameter_in_mm,
+             lu.cervix_tumor_anteroposterior_ap_diameter_in_mm,
+             lu.cervix_tumor_transversal_diameter_in_mm) <= 20
+            THEN 'Group 3.2 (IIIC1 <=2cm)'
         ELSE NULL
     END AS figo_group_cervix,  -- <<< VERIFY exact FIGO stage strings
 
@@ -858,6 +904,8 @@ SELECT
 FROM confirmed_mdt_first pc
 LEFT JOIN topography_list tl
     ON tl.encounter_id = pc.encounter_id
+LEFT JOIN latest_ultrasound lu
+    ON lu.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN surgical_procedure_flag spf
     ON spf.encounter_id = pc.encounter_id
 LEFT JOIN next_fumdt nf
