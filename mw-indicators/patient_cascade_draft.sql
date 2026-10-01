@@ -1,6 +1,6 @@
-/* =====================================================================
-   PATIENT CASCADE BY FIGO STAGE — cervical cancer (Malawi EA / DHIS2)
-    ===================================================================== */
+-- =====================================================================
+-- PATIENT CASCADE BY FIGO STAGE — cervical cancer (Malawi EA / DHIS2)
+-- =====================================================================
 
 WITH pre_mdt_confirmed AS (
     SELECT
@@ -174,8 +174,8 @@ upfront_surgery_candidates AS (
          WHERE pp.encounter_id = csr.encounter_id
            AND pp.reference_form_field_path = '19 Cervical Surgical Report'
            AND LOWER(pp.procedure_performed) LIKE '%hysterectomy%')
-    /* STRICT "upfront" = surgery is the first treatment (no chemo before it),
-       per spec note "No chemotherapy form is completed before surgery". */
+    -- STRICT "upfront" = surgery is the first treatment (no chemo before it),
+    -- per spec note "No chemotherapy form is completed before surgery".
      AND NOT EXISTS (
          SELECT 1 FROM "27_chemotherapy_clinical_assessment_and_treatment" ch
          WHERE ch.patient_id = pc.patient_id
@@ -274,16 +274,14 @@ nac_3_cycles AS (
     FROM nac_3_cycles_candidates
     WHERE rn = 1),
 
-/*
- * nact_response_candidates
- * Priority 1 : Follow Up MDT after cycle 3 with treatment_type = 'Chemotherapy follow up'
- *              AND a chemo response value filled in
- * Priority 2 : Subsequent Consultation after cycle 3 with a chemo response value filled in
- * Tie-breaking rules:
- *   - Earlier date wins
- *   - Same date -> source priority 1 (Follow Up MDT) wins over 2 (Subsequent Consultation)
- *   - Same date + same source -> LATEST encounter_id wins (most recent record of that day)
- */
+-- nact_response_candidates
+-- Priority 1 : Follow Up MDT after cycle 3 with treatment_type = 'Chemotherapy follow up'
+--              AND a chemo response value filled in
+-- Priority 2 : Subsequent Consultation after cycle 3 with a chemo response value filled in
+-- Tie-breaking rules:
+--   - Earlier date wins
+--   - Same date -> source priority 1 (Follow Up MDT) wins over 2 (Subsequent Consultation)
+--   - Same date + same source -> LATEST encounter_id wins (most recent record of that day)
 nact_response_candidates AS (
     SELECT
         pc.encounter_id AS confirmed_mdt_encounter_id,
@@ -371,19 +369,19 @@ palliative_after_nac3 AS (
     FROM palliative_after_nac3_candidates
     WHERE rn = 1),
 
-/* =====================================================================
-   ================  NEW ADDITIONS : indicators 2.x & 3.x  =============
-   =====================================================================
-   Everything below reuses four "event source" CTEs so the same logic
-   isn't rewritten a dozen times, then a set of small "first event after
-   anchor X" pickers. Each picker returns at most one row per patient.
-   ===================================================================== */
+-- =====================================================================
+-- ================  NEW ADDITIONS : indicators 2.x & 3.x  =============
+-- =====================================================================
+-- Everything below reuses four "event source" CTEs so the same logic
+-- isn't rewritten a dozen times, then a set of small "first event after
+-- anchor X" pickers. Each picker returns at most one row per patient.
+-- =====================================================================
 
-/* ---- Shared event sources ------------------------------------------ */
+-- ---- Shared event sources ------------------------------------------
 
-/* Any chemotherapy-response assessment, from Follow-up MDT (priority 1)
-   or Subsequent Consultation (priority 2). Same value list & tie-break
-   philosophy as the existing nact_response logic above.                */
+-- Any chemotherapy-response assessment, from Follow-up MDT (priority 1)
+-- or Subsequent Consultation (priority 2). Same value list & tie-break
+-- philosophy as the existing nact_response logic above.
 chemo_response_events AS (
     SELECT
         fumdt.patient_id,
@@ -414,8 +412,8 @@ chemo_response_events AS (
           'Stable disease',
           'Progressive disease')),
 
-/* Follow-up MDT proposed-management events (used for palliative and
-   CCRT/radiation referrals).                                           */
+-- Follow-up MDT proposed-management events (used for palliative and
+-- CCRT/radiation referrals).
 fumdt_mgmt_events AS (
     SELECT
         fum.patient_id,
@@ -427,20 +425,20 @@ fumdt_mgmt_events AS (
       ON pmp.encounter_id             = fum.encounter_id
      AND pmp.reference_form_field_path = fum.form_field_path),
 
-/* All cervical surgeries.                                              */
+-- All cervical surgeries.
 surgery_events AS (
     SELECT patient_id, date_of_surgery
     FROM "19_cervical_surgical_report"),
 
-/* Chemoradiation actually delivered (completed with or without delay). */
+-- Chemoradiation actually delivered (completed with or without delay).
 chemoradiation_done_events AS (
     SELECT patient_id, chemoradiotherapy_start_date, radiotherapy_outcome
     FROM "31_chemoradiation"
     WHERE radiotherapy_outcome IN ('Completed without delay', 'Completed with delay')),
 
-/* ---- Chemotherapy cycle anchors ------------------------------------ */
+-- ---- Chemotherapy cycle anchors ------------------------------------
 
-/* 2.6 : last NAC record with cycle_number > 3 (the "last cycle").      */
+-- 2.6 : last NAC record with cycle_number > 3 (the "last cycle").
 nac_more_than_3_candidates AS (
     SELECT
         pc.encounter_id AS confirmed_mdt_encounter_id,
@@ -460,7 +458,7 @@ nac_more_than_3 AS (
     SELECT confirmed_mdt_encounter_id, date_nac_last_cycle, nac_last_cycle_number
     FROM nac_more_than_3_candidates WHERE rn = 1),
 
-/* 3.1 : first Induction-chemo record reaching cycle_number >= 3.       */
+-- 3.1 : first Induction-chemo record reaching cycle_number >= 3.
 ic_3_cycles_candidates AS (
     SELECT
         pc.encounter_id AS confirmed_mdt_encounter_id,
@@ -480,7 +478,7 @@ ic_3_cycles AS (
     SELECT confirmed_mdt_encounter_id, date_ic_3_cycles, ic_cycle_number
     FROM ic_3_cycles_candidates WHERE rn = 1),
 
-/* 3.7 : last Induction-chemo record with cycle_number > 3.            */
+-- 3.7 : last Induction-chemo record with cycle_number > 3.
 ic_more_than_3_candidates AS (
     SELECT
         pc.encounter_id AS confirmed_mdt_encounter_id,
@@ -500,9 +498,9 @@ ic_more_than_3 AS (
     SELECT confirmed_mdt_encounter_id, date_ic_last_cycle, ic_last_cycle_number
     FROM ic_more_than_3_candidates WHERE rn = 1),
 
-/* ---- GROUP 2 pickers (Ib3 / IIa2 / IIb : NACT pathway) ------------- */
+-- ---- GROUP 2 pickers (Ib3 / IIa2 / IIb : NACT pathway) -------------
 
-/* 2.3 : surgery after the 3rd NAC cycle.                               */
+-- 2.3 : surgery after the 3rd NAC cycle.
 surgery_post_nac3 AS (
     SELECT confirmed_mdt_encounter_id, date_of_surgery AS date_surgery_post_nac3
     FROM (
@@ -516,7 +514,77 @@ surgery_post_nac3 AS (
          AND s.date_of_surgery > a.date_NAC_3_cycles
     ) t WHERE rn = 1),
 
-/* 2.7 & 2.9 : first response after the last (>3) NAC cycle.            */
+-- 3.2.3 : CCRT referral after the 3rd NAC cycle.
+ccrt_ref_post_nac3 AS (
+        SELECT confirmed_mdt_encounter_id, event_date AS date_ccrt_referred_post_nac3
+        FROM (
+                SELECT pc.encounter_id AS confirmed_mdt_encounter_id, m.event_date,
+                             ROW_NUMBER() OVER (PARTITION BY pc.encounter_id
+                                                                    ORDER BY m.event_date, m.source_encounter_id) AS rn
+                FROM confirmed_mdt_first pc
+                JOIN nac_3_cycles a ON a.confirmed_mdt_encounter_id = pc.encounter_id
+                JOIN fumdt_mgmt_events m
+                    ON m.patient_id = pc.patient_id
+                 AND m.proposed_management_plan = 'Radiation therapy'
+                 AND m.event_date > a.date_NAC_3_cycles
+        ) t WHERE rn = 1),
+
+-- 3.2.4 : completed CCRT after the referral following the 3rd NAC cycle.
+ccrt_done_post_nac3 AS (
+        SELECT confirmed_mdt_encounter_id,
+                     chemoradiotherapy_start_date AS date_ccrt_done_post_nac3,
+                     radiotherapy_outcome         AS ccrt_outcome_post_nac3
+        FROM (
+                SELECT r.confirmed_mdt_encounter_id,
+                             c.chemoradiotherapy_start_date, c.radiotherapy_outcome,
+                             ROW_NUMBER() OVER (
+                                     PARTITION BY r.confirmed_mdt_encounter_id
+                                     ORDER BY c.chemoradiotherapy_start_date) AS rn
+                FROM ccrt_ref_post_nac3 r
+                JOIN confirmed_mdt_first pc
+                    ON pc.encounter_id = r.confirmed_mdt_encounter_id
+                JOIN chemoradiation_done_events c
+                    ON c.patient_id = pc.patient_id
+                 AND c.chemoradiotherapy_start_date > r.date_ccrt_referred_post_nac3
+        ) t WHERE rn = 1),
+
+-- 3.2.8 : CCRT referral after surgery following the 3rd NAC cycle.
+ccrt_ref_post_surgery_nac3 AS (
+        SELECT confirmed_mdt_encounter_id,
+                     event_date AS date_ccrt_referred_post_surgery_nac3
+        FROM (
+                SELECT pc.encounter_id AS confirmed_mdt_encounter_id, m.event_date,
+                             ROW_NUMBER() OVER (PARTITION BY pc.encounter_id
+                                                                    ORDER BY m.event_date, m.source_encounter_id) AS rn
+                FROM confirmed_mdt_first pc
+                JOIN surgery_post_nac3 s
+                    ON s.confirmed_mdt_encounter_id = pc.encounter_id
+                JOIN fumdt_mgmt_events m
+                    ON m.patient_id = pc.patient_id
+                 AND m.proposed_management_plan = 'Radiation therapy'
+                 AND m.event_date > s.date_surgery_post_nac3
+        ) t WHERE rn = 1),
+
+-- 3.2.9 : completed CCRT after referral following surgery after 3 NAC cycles.
+ccrt_done_post_surgery_nac3 AS (
+        SELECT confirmed_mdt_encounter_id,
+                     chemoradiotherapy_start_date AS date_ccrt_done_post_surgery_nac3,
+                     radiotherapy_outcome         AS ccrt_outcome_post_surgery_nac3
+        FROM (
+                SELECT r.confirmed_mdt_encounter_id,
+                             c.chemoradiotherapy_start_date, c.radiotherapy_outcome,
+                             ROW_NUMBER() OVER (
+                                     PARTITION BY r.confirmed_mdt_encounter_id
+                                     ORDER BY c.chemoradiotherapy_start_date) AS rn
+                FROM ccrt_ref_post_surgery_nac3 r
+                JOIN confirmed_mdt_first pc
+                    ON pc.encounter_id = r.confirmed_mdt_encounter_id
+                JOIN chemoradiation_done_events c
+                    ON c.patient_id = pc.patient_id
+                 AND c.chemoradiotherapy_start_date > r.date_ccrt_referred_post_surgery_nac3
+        ) t WHERE rn = 1),
+
+-- 2.7 & 2.9 : first response after the last (>3) NAC cycle.
 nac_gt3_response AS (
     SELECT confirmed_mdt_encounter_id,
            response_date AS date_nact_response_after_gt3,
@@ -535,7 +603,25 @@ nac_gt3_response AS (
          AND e.response_date > a.date_nac_last_cycle
     ) t WHERE rn = 1),
 
-/* 2.8 : surgery after the last (>3) NAC cycle.                         */
+    -- 3.2.22 : palliative referral after a stable/progressive response to >3 NAC cycles.
+    palliative_post_nac_gt3_stable_progressed AS (
+        SELECT confirmed_mdt_encounter_id,
+            event_date AS date_palliative_post_nac_gt3_stable_progressed
+        FROM (
+         SELECT pc.encounter_id AS confirmed_mdt_encounter_id, m.event_date,
+             ROW_NUMBER() OVER (PARTITION BY pc.encounter_id
+                          ORDER BY m.event_date, m.source_encounter_id) AS rn
+         FROM confirmed_mdt_first pc
+         JOIN nac_gt3_response r
+           ON r.confirmed_mdt_encounter_id = pc.encounter_id
+          AND r.chemotherapy_response IN ('Stable disease', 'Progressive disease')
+         JOIN fumdt_mgmt_events m
+           ON m.patient_id = pc.patient_id
+          AND m.proposed_management_plan = 'Palliative Care'
+          AND m.event_date > r.date_nact_response_after_gt3
+        ) t WHERE rn = 1),
+
+-- 2.8 : surgery after the last (>3) NAC cycle.
 surgery_post_nac_gt3 AS (
     SELECT confirmed_mdt_encounter_id, date_of_surgery AS date_surgery_post_nac_gt3
     FROM (
@@ -549,7 +635,43 @@ surgery_post_nac_gt3 AS (
          AND s.date_of_surgery > a.date_nac_last_cycle
     ) t WHERE rn = 1),
 
-/* 2.10 : palliative referral after the last (>3) NAC cycle.           */
+-- 3.2.19 : CCRT referral after surgery following >3 NAC cycles.
+ccrt_ref_post_surgery_nac_gt3 AS (
+        SELECT confirmed_mdt_encounter_id,
+                     event_date AS date_ccrt_referred_post_surgery_nac_gt3
+        FROM (
+                SELECT pc.encounter_id AS confirmed_mdt_encounter_id, m.event_date,
+                             ROW_NUMBER() OVER (PARTITION BY pc.encounter_id
+                                                                    ORDER BY m.event_date, m.source_encounter_id) AS rn
+                FROM confirmed_mdt_first pc
+                JOIN surgery_post_nac_gt3 s
+                    ON s.confirmed_mdt_encounter_id = pc.encounter_id
+                JOIN fumdt_mgmt_events m
+                    ON m.patient_id = pc.patient_id
+                 AND m.proposed_management_plan = 'Radiation therapy'
+                 AND m.event_date > s.date_surgery_post_nac_gt3
+        ) t WHERE rn = 1),
+
+-- 3.2.20 : completed CCRT after referral following surgery after >3 NAC cycles.
+ccrt_done_post_surgery_nac_gt3 AS (
+        SELECT confirmed_mdt_encounter_id,
+                     chemoradiotherapy_start_date AS date_ccrt_done_post_surgery_nac_gt3,
+                     radiotherapy_outcome         AS ccrt_outcome_post_surgery_nac_gt3
+        FROM (
+                SELECT r.confirmed_mdt_encounter_id,
+                             c.chemoradiotherapy_start_date, c.radiotherapy_outcome,
+                             ROW_NUMBER() OVER (
+                                     PARTITION BY r.confirmed_mdt_encounter_id
+                                     ORDER BY c.chemoradiotherapy_start_date) AS rn
+                FROM ccrt_ref_post_surgery_nac_gt3 r
+                JOIN confirmed_mdt_first pc
+                    ON pc.encounter_id = r.confirmed_mdt_encounter_id
+                JOIN chemoradiation_done_events c
+                    ON c.patient_id = pc.patient_id
+                 AND c.chemoradiotherapy_start_date > r.date_ccrt_referred_post_surgery_nac_gt3
+        ) t WHERE rn = 1),
+
+-- 2.10 : palliative referral after the last (>3) NAC cycle.
 palliative_post_nac_gt3 AS (
     SELECT confirmed_mdt_encounter_id, event_date AS date_palliative_post_nac_gt3
     FROM (
@@ -564,7 +686,7 @@ palliative_post_nac_gt3 AS (
          AND m.event_date > a.date_nac_last_cycle
     ) t WHERE rn = 1),
 
-/* 2.11 : CCRT (radiation) referral after the last (>3) NAC cycle.     */
+-- 2.11 : CCRT (radiation) referral after the last (>3) NAC cycle.
 ccrt_ref_post_nac_gt3 AS (
     SELECT confirmed_mdt_encounter_id, event_date AS date_ccrt_referred_post_nac_gt3
     FROM (
@@ -579,7 +701,7 @@ ccrt_ref_post_nac_gt3 AS (
          AND m.event_date > a.date_nac_last_cycle
     ) t WHERE rn = 1),
 
-/* 2.12 : CCRT delivered after the last (>3) NAC cycle.                */
+-- 2.12 : CCRT delivered after the last (>3) NAC cycle.
 ccrt_done_post_nac_gt3 AS (
     SELECT confirmed_mdt_encounter_id,
            chemoradiotherapy_start_date AS date_ccrt_done_post_nac_gt3,
@@ -596,9 +718,9 @@ ccrt_done_post_nac_gt3 AS (
          AND c.chemoradiotherapy_start_date > a.date_nac_last_cycle
     ) t WHERE rn = 1),
 
-/* ---- GROUP 3 pickers (IIIa / IIIb / IIIc : Induction pathway) ------ */
+-- ---- GROUP 3 pickers (IIIa / IIIb / IIIc : Induction pathway) ------
 
-/* 3.2 & 3.5 : first response after the 3rd IC cycle.                   */
+-- 3.2 & 3.5 : first response after the 3rd IC cycle.
 ic3_response AS (
     SELECT confirmed_mdt_encounter_id,
            response_date AS date_ic_response,
@@ -617,7 +739,7 @@ ic3_response AS (
          AND e.response_date > a.date_ic_3_cycles
     ) t WHERE rn = 1),
 
-/* 3.3 : CCRT referral after 3 IC.                                     */
+-- 3.3 : CCRT referral after 3 IC.
 ccrt_ref_post_ic3 AS (
     SELECT confirmed_mdt_encounter_id, event_date AS date_ccrt_referred_post_ic3
     FROM (
@@ -632,7 +754,7 @@ ccrt_ref_post_ic3 AS (
          AND m.event_date > a.date_ic_3_cycles
     ) t WHERE rn = 1),
 
-/* 3.4 : CCRT delivered after 3 IC.                                    */
+-- 3.4 : CCRT delivered after 3 IC.
 ccrt_done_post_ic3 AS (
     SELECT confirmed_mdt_encounter_id,
            chemoradiotherapy_start_date AS date_ccrt_done_post_ic3,
@@ -649,7 +771,7 @@ ccrt_done_post_ic3 AS (
          AND c.chemoradiotherapy_start_date > a.date_ic_3_cycles
     ) t WHERE rn = 1),
 
-/* 3.6 : palliative referral after 3 IC.                              */
+-- 3.6 : palliative referral after 3 IC.
 palliative_post_ic3 AS (
     SELECT confirmed_mdt_encounter_id, event_date AS date_palliative_post_ic3
     FROM (
@@ -664,7 +786,7 @@ palliative_post_ic3 AS (
          AND m.event_date > a.date_ic_3_cycles
     ) t WHERE rn = 1),
 
-/* 3.8 & 3.11 : first response after the last (>3) IC cycle.           */
+-- 3.8 & 3.11 : first response after the last (>3) IC cycle.
 ic_gt3_response AS (
     SELECT confirmed_mdt_encounter_id,
            response_date AS date_ic_response_after_gt3,
@@ -683,7 +805,7 @@ ic_gt3_response AS (
          AND e.response_date > a.date_ic_last_cycle
     ) t WHERE rn = 1),
 
-/* 3.9 : CCRT referral after >3 IC.                                   */
+-- 3.9 : CCRT referral after >3 IC.
 ccrt_ref_post_ic_gt3 AS (
     SELECT confirmed_mdt_encounter_id, event_date AS date_ccrt_referred_post_ic_gt3
     FROM (
@@ -698,7 +820,7 @@ ccrt_ref_post_ic_gt3 AS (
          AND m.event_date > a.date_ic_last_cycle
     ) t WHERE rn = 1),
 
-/* 3.10 : CCRT delivered after >3 IC.                                 */
+-- 3.10 : CCRT delivered after >3 IC.
 ccrt_done_post_ic_gt3 AS (
     SELECT confirmed_mdt_encounter_id,
            chemoradiotherapy_start_date AS date_ccrt_done_post_ic_gt3,
@@ -715,7 +837,7 @@ ccrt_done_post_ic_gt3 AS (
          AND c.chemoradiotherapy_start_date > a.date_ic_last_cycle
     ) t WHERE rn = 1),
 
-/* 3.12 : palliative referral after >3 IC.                            */
+-- 3.12 : palliative referral after >3 IC.
 palliative_post_ic_gt3 AS (
     SELECT confirmed_mdt_encounter_id, event_date AS date_palliative_post_ic_gt3
     FROM (
@@ -730,9 +852,9 @@ palliative_post_ic_gt3 AS (
          AND m.event_date > a.date_ic_last_cycle
     ) t WHERE rn = 1)
 
-/* =====================================================================
-   MAIN QUERY  (one row per patient)
-   ===================================================================== */
+-- =====================================================================
+-- MAIN QUERY  (one row per patient)
+-- =====================================================================
 SELECT
     pc.confirmed_malignancy_source,
     pc.patient_id,
@@ -753,30 +875,18 @@ SELECT
         lu.cervix_tumor_transversal_diameter_in_mm
     ) AS cervix_tumor_size_longitudinal_x_ap_x_transverse_mm,
 
-    /* FIGO grouping helper for the cervix cascade (verify stored strings) */
+    -- FIGO grouping helper for the cervix cascade (verify stored strings)
     CASE
         WHEN pc.cervix_figo IN ('IB1','IB2','IIA1')            THEN 'Group 1 (IB1/IB2/IIA1)'
         WHEN pc.cervix_figo IN ('IB3','IIA2','IIB')            THEN 'Group 2 (IB3/IIA2/IIB)'
         WHEN pc.cervix_figo IN ('IIIA','IIIB','IIIC2')
-            THEN 'Group 3.1 (IIIA/IIIB/IIIC1 >2cm/IIIC2)'
+            THEN 'Group 3.1 (IIIA/IIIB/IIIC2)'
         WHEN pc.cervix_figo = 'IIIC1'
-         AND lu.cervix_tumor_identification = 'Yes'
-         AND GREATEST(
-             lu.cervix_tumor_longitudinal_diameter_in_mm,
-             lu.cervix_tumor_anteroposterior_ap_diameter_in_mm,
-             lu.cervix_tumor_transversal_diameter_in_mm) > 20
-            THEN 'Group 3.1 (IIIA/IIIB/IIIC1 >2cm/IIIC2)'
-        WHEN pc.cervix_figo = 'IIIC1'
-         AND lu.cervix_tumor_identification = 'Yes'
-         AND GREATEST(
-             lu.cervix_tumor_longitudinal_diameter_in_mm,
-             lu.cervix_tumor_anteroposterior_ap_diameter_in_mm,
-             lu.cervix_tumor_transversal_diameter_in_mm) <= 20
-            THEN 'Group 3.2 (IIIC1 <=2cm)'
+            THEN 'Group 3.2 (IIIC1)'
         ELSE NULL
     END AS figo_group_cervix,  -- <<< VERIFY exact FIGO stage strings
 
-    /* ---------- GROUP 1 : Ib1 / Ib2 / IIa1 (upfront surgery) --------- */
+    -- ---------- GROUP 1 : Ib1 / Ib2 / IIa1 (upfront surgery) ---------
     spf.surgical_procedure_proposed,                        -- Pre-MDT proposed surgery
     nf.date_next_fumdt,
     us.date_upfront_cervical_surgery,                       -- 1.1
@@ -793,7 +903,7 @@ SELECT
     crps.chemoradiotherapy_start_date,                      -- 1.3
     crps.radiotherapy_outcome,
 
-    /* ---------- GROUP 2 : Ib3 / IIa2 / IIb (NACT) ------------------- */
+    -- ---------- GROUP 2 : Ib3 / IIa2 / IIb (NACT) -------------------
     nac.date_NAC_3_cycles,                                  -- 2.1
     nac.cycle_number,
     nr.date_NACT_response,                                  -- 2.2 / 2.4 (date)
@@ -827,7 +937,7 @@ SELECT
          THEN 'Yes' END AS nac_gt3_responded,              -- 2.7
     CASE WHEN ngr.chemotherapy_response IN
              ('Stable disease','Progressive disease')
-         THEN 'Yes' END AS nac_gt3_stable_or_progressed,   -- 2.9
+         THEN 'Yes' END AS nac_gt3_stable_or_progressed,   -- 2.9 / 3.2.21
 
     spng.date_surgery_post_nac_gt3,                         -- 2.8 (date)
     CASE WHEN spng.date_surgery_post_nac_gt3 IS NOT NULL THEN 'Yes' END
@@ -846,7 +956,36 @@ SELECT
     CASE WHEN cdng.date_ccrt_done_post_nac_gt3 IS NOT NULL THEN 'Yes' END
         AS ccrt_done_after_nac_gt3,                         -- 2.12
 
-    /* ---------- GROUP 3 : IIIa / IIIb / IIIc (Induction chemo) ------ */
+    -- GROUP 3.2 : IIIC1 NACT pathway
+    crn3.date_ccrt_referred_post_nac3,                     -- 3.2.3 (date)
+    CASE WHEN crn3.date_ccrt_referred_post_nac3 IS NOT NULL THEN 'Yes' END
+        AS ccrt_referred_after_nac3_group32,               -- 3.2.3
+    cdn3.date_ccrt_done_post_nac3,                         -- 3.2.4 (date)
+    cdn3.ccrt_outcome_post_nac3,                           -- 3.2.4 (outcome)
+    CASE WHEN cdn3.date_ccrt_done_post_nac3 IS NOT NULL THEN 'Yes' END
+        AS ccrt_done_after_nac3_group32,                   -- 3.2.4
+
+    crsn3.date_ccrt_referred_post_surgery_nac3,            -- 3.2.8 (date)
+    CASE WHEN crsn3.date_ccrt_referred_post_surgery_nac3 IS NOT NULL THEN 'Yes' END
+        AS ccrt_referred_after_surgery_nac3_group32,       -- 3.2.8
+    cdsn3.date_ccrt_done_post_surgery_nac3,                -- 3.2.9 (date)
+    cdsn3.ccrt_outcome_post_surgery_nac3,                  -- 3.2.9 (outcome)
+    CASE WHEN cdsn3.date_ccrt_done_post_surgery_nac3 IS NOT NULL THEN 'Yes' END
+        AS ccrt_done_after_surgery_nac3_group32,           -- 3.2.9
+
+    crsng.date_ccrt_referred_post_surgery_nac_gt3,        -- 3.2.19 (date)
+    CASE WHEN crsng.date_ccrt_referred_post_surgery_nac_gt3 IS NOT NULL THEN 'Yes' END
+        AS ccrt_referred_after_surgery_nac_gt3_group32,    -- 3.2.19
+    cdsng.date_ccrt_done_post_surgery_nac_gt3,             -- 3.2.20 (date)
+    cdsng.ccrt_outcome_post_surgery_nac_gt3,               -- 3.2.20 (outcome)
+    CASE WHEN cdsng.date_ccrt_done_post_surgery_nac_gt3 IS NOT NULL THEN 'Yes' END
+        AS ccrt_done_after_surgery_nac_gt3_group32,        -- 3.2.20
+
+    psgt3.date_palliative_post_nac_gt3_stable_progressed, -- 3.2.22 (date)
+    CASE WHEN psgt3.date_palliative_post_nac_gt3_stable_progressed IS NOT NULL THEN 'Yes' END
+        AS referred_to_palliative_after_stable_progression_gt3_nac, -- 3.2.22
+
+    -- ---------- GROUP 3 : IIIa / IIIb / IIIc (Induction chemo) ------
     ic3.date_ic_3_cycles,                                   -- 3.1 (date)
     ic3.ic_cycle_number,                                    -- 3.1 (cycle number)
     CASE WHEN ic3.date_ic_3_cycles IS NOT NULL THEN 'Yes' END
@@ -926,7 +1065,7 @@ LEFT JOIN nact_response nr
     ON nr.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN palliative_after_nac3 pan
     ON pan.confirmed_mdt_encounter_id = pc.encounter_id
-/* --- new joins --- */
+-- --- new joins ---
 LEFT JOIN surgery_post_nac3        spn3 ON spn3.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN nac_more_than_3          nm3  ON nm3.confirmed_mdt_encounter_id  = pc.encounter_id
 LEFT JOIN nac_gt3_response         ngr  ON ngr.confirmed_mdt_encounter_id  = pc.encounter_id
@@ -934,6 +1073,14 @@ LEFT JOIN surgery_post_nac_gt3     spng ON spng.confirmed_mdt_encounter_id = pc.
 LEFT JOIN palliative_post_nac_gt3  ppng ON ppng.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN ccrt_ref_post_nac_gt3    crng ON crng.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN ccrt_done_post_nac_gt3   cdng ON cdng.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN ccrt_ref_post_nac3       crn3 ON crn3.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN ccrt_done_post_nac3      cdn3 ON cdn3.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN ccrt_ref_post_surgery_nac3 crsn3 ON crsn3.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN ccrt_done_post_surgery_nac3 cdsn3 ON cdsn3.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN ccrt_ref_post_surgery_nac_gt3 crsng ON crsng.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN ccrt_done_post_surgery_nac_gt3 cdsng ON cdsng.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN palliative_post_nac_gt3_stable_progressed psgt3
+    ON psgt3.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN ic_3_cycles              ic3  ON ic3.confirmed_mdt_encounter_id  = pc.encounter_id
 LEFT JOIN ic3_response             ic3r ON ic3r.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN ccrt_ref_post_ic3        cri3 ON cri3.confirmed_mdt_encounter_id = pc.encounter_id
