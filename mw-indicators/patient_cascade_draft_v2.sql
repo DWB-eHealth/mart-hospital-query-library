@@ -1,5 +1,3 @@
--- Patient cascade V2 — build output columns one at a time.
-
 WITH pre_mdt_confirmed AS (
     SELECT
         ptm.patient_id,
@@ -218,6 +216,9 @@ more_than_3_cycles_candidates AS (
     SELECT
        pc.encounter_id AS confirmed_mdt_encounter_id,
        chemo.date_recorded AS date_more_than_3_cycles,
+       MAX(chemo.cycle_number) OVER (
+           PARTITION BY pc.encounter_id
+       ) AS max_cycle_number,
        ROW_NUMBER() OVER (
            PARTITION BY pc.encounter_id
            ORDER BY chemo.date_recorded DESC, chemo.encounter_id DESC
@@ -231,7 +232,8 @@ more_than_3_cycles_candidates AS (
 more_than_3_cycles AS (
     SELECT
        confirmed_mdt_encounter_id,
-       date_more_than_3_cycles
+       date_more_than_3_cycles,
+       max_cycle_number
     FROM more_than_3_cycles_candidates
     WHERE row = 1
 ),
@@ -593,6 +595,45 @@ ln_pos_first AS (
     FROM ln_pos_candidates
     WHERE row = 1
 ),
+upfront_surgery_histology_candidates AS (
+    SELECT
+        us.confirmed_mdt_encounter_id,
+        bcs.microbiology_margin_status_invasive,
+        bcs.microbiology_margin_status_pre_invasive,
+        bcs.microbiology_parametrial_invasion,
+        ROW_NUMBER() OVER (
+            PARTITION BY us.confirmed_mdt_encounter_id
+            ORDER BY bcs.microbiology_date_of_result, bcs.encounter_id
+        ) AS row
+    FROM upfront_surgery us
+    JOIN confirmed_mdt_first pc
+      ON pc.encounter_id = us.confirmed_mdt_encounter_id
+    JOIN bacteriology_concept_set bcs
+      ON bcs.patient_id = pc.patient_id
+     AND bcs.patient_program_id = pc.patient_program_id
+     AND bcs.microbiology_date_of_result >= us.date_upfront_surgery
+    WHERE bcs.microbiology_margin_status_invasive IS NOT NULL
+       OR bcs.microbiology_margin_status_pre_invasive IS NOT NULL
+       OR bcs.microbiology_parametrial_invasion IS NOT NULL
+),
+upfront_surgery_histology AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        CASE
+            WHEN LOWER(BTRIM(microbiology_margin_status_invasive)) = 'positive'
+              OR LOWER(BTRIM(microbiology_margin_status_pre_invasive)) = 'positive'
+                THEN 'Positive'
+            WHEN LOWER(BTRIM(microbiology_margin_status_invasive)) = 'negative'
+             AND LOWER(BTRIM(microbiology_margin_status_pre_invasive)) = 'negative'
+                THEN 'Negative'
+        END AS margins,
+        CASE
+            WHEN LOWER(BTRIM(microbiology_parametrial_invasion)) = 'yes' THEN 'Yes'
+            WHEN LOWER(BTRIM(microbiology_parametrial_invasion)) = 'no' THEN 'No'
+        END AS parameters
+    FROM upfront_surgery_histology_candidates
+    WHERE row = 1
+),
 cycle_3_ln_pos_candidates AS (
     SELECT
         c3s.confirmed_mdt_encounter_id,
@@ -716,6 +757,161 @@ more3c_histology AS (
         END AS parameters
     FROM more3c_histology_candidates
     WHERE row = 1
+),
+more3c_follow_up_mdt_candidates AS (
+    SELECT
+        m3c.confirmed_mdt_encounter_id,
+        fum.encounter_id AS more3c_follow_up_mdt_encounter_id,
+        fum.form_field_path AS more3c_follow_up_mdt_form_field_path,
+        fum.date_recorded AS more3c_follow_up_mdt_date,
+        fum.chemotherapy_response,
+        ROW_NUMBER() OVER (
+            PARTITION BY m3c.confirmed_mdt_encounter_id
+            ORDER BY fum.date_recorded, fum.encounter_id
+        ) AS row
+    FROM more_than_3_cycles m3c
+    JOIN confirmed_mdt_first pc
+      ON pc.encounter_id = m3c.confirmed_mdt_encounter_id
+    JOIN public."11_follow_up_mdt" fum
+      ON fum.patient_id = pc.patient_id
+     AND fum.date_recorded > m3c.date_more_than_3_cycles
+     AND fum.treatment_type = 'Chemotherapy follow up'
+),
+more3c_follow_up_mdt AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        more3c_follow_up_mdt_encounter_id,
+        more3c_follow_up_mdt_form_field_path,
+        more3c_follow_up_mdt_date,
+        chemotherapy_response
+    FROM more3c_follow_up_mdt_candidates
+    WHERE row = 1
+),
+more3c_follow_up_mdt_crt_candidates AS (
+    SELECT
+        m3fum.confirmed_mdt_encounter_id,
+        cr.chemoradiotherapy_start_date,
+        cr.radiotherapy_outcome,
+        ROW_NUMBER() OVER (
+            PARTITION BY m3fum.confirmed_mdt_encounter_id
+            ORDER BY cr.chemoradiotherapy_start_date
+        ) AS row
+    FROM more3c_follow_up_mdt m3fum
+    JOIN proposed_management_plan pmp
+      ON pmp.encounter_id = m3fum.more3c_follow_up_mdt_encounter_id
+     AND pmp.reference_form_field_path = m3fum.more3c_follow_up_mdt_form_field_path
+     AND pmp.proposed_management_plan = 'Radiation therapy'
+    JOIN confirmed_mdt_first pc
+      ON pc.encounter_id = m3fum.confirmed_mdt_encounter_id
+    JOIN "31_chemoradiation" cr
+      ON cr.patient_id = pc.patient_id
+     AND cr.chemoradiotherapy_start_date > m3fum.more3c_follow_up_mdt_date
+     AND cr.radiotherapy_outcome IN (
+         'Completed without delay',
+         'Completed with delay'
+     )
+),
+more3c_follow_up_mdt_crt AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        chemoradiotherapy_start_date,
+        radiotherapy_outcome
+    FROM more3c_follow_up_mdt_crt_candidates
+    WHERE row = 1
+),
+more3c_subsequent_consultation_candidates AS (
+    SELECT
+        m3c.confirmed_mdt_encounter_id,
+        sc.chemotherapy_response,
+        ROW_NUMBER() OVER (
+            PARTITION BY m3c.confirmed_mdt_encounter_id
+            ORDER BY sc.date_recorded, sc.encounter_id
+        ) AS row
+    FROM more_than_3_cycles m3c
+    JOIN confirmed_mdt_first pc
+      ON pc.encounter_id = m3c.confirmed_mdt_encounter_id
+    JOIN "07_subsequent_consultation" sc
+      ON sc.patient_id = pc.patient_id
+     AND sc.date_recorded > m3c.date_more_than_3_cycles
+     AND NULLIF(BTRIM(sc.chemotherapy_response), '') IS NOT NULL
+),
+more3c_subsequent_consultation AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        chemotherapy_response
+    FROM more3c_subsequent_consultation_candidates
+    WHERE row = 1
+),
+more3c_chemo_response AS (
+    SELECT
+        m3c.confirmed_mdt_encounter_id,
+        COALESCE(
+            NULLIF(BTRIM(mdt.chemotherapy_response), ''),
+            NULLIF(BTRIM(sc.chemotherapy_response), '')
+        ) AS chemotherapy_response
+    FROM more_than_3_cycles m3c
+    LEFT JOIN more3c_follow_up_mdt mdt
+      ON mdt.confirmed_mdt_encounter_id = m3c.confirmed_mdt_encounter_id
+    LEFT JOIN more3c_subsequent_consultation sc
+      ON sc.confirmed_mdt_encounter_id = m3c.confirmed_mdt_encounter_id
+),
+more3c_post_surgery_mdt_candidates AS (
+    SELECT
+        m3s.confirmed_mdt_encounter_id,
+        fum.encounter_id AS more3c_post_surgery_mdt_encounter_id,
+        fum.form_field_path AS more3c_post_surgery_mdt_form_field_path,
+        fum.date_recorded AS more3c_post_surgery_mdt_date,
+        ROW_NUMBER() OVER (
+            PARTITION BY m3s.confirmed_mdt_encounter_id
+            ORDER BY fum.date_recorded, fum.encounter_id
+        ) AS row
+    FROM more_than_3_cycles_surgery m3s
+    JOIN confirmed_mdt_first pc
+      ON pc.encounter_id = m3s.confirmed_mdt_encounter_id
+    JOIN public."11_follow_up_mdt" fum
+      ON fum.patient_id = pc.patient_id
+     AND fum.date_recorded > m3s.date_surgery_after_more_than_3_cycles
+),
+more3c_post_surgery_mdt AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        more3c_post_surgery_mdt_encounter_id,
+        more3c_post_surgery_mdt_form_field_path,
+        more3c_post_surgery_mdt_date
+    FROM more3c_post_surgery_mdt_candidates
+    WHERE row = 1
+),
+more3c_post_surgery_crt_candidates AS (
+    SELECT
+        m3m.confirmed_mdt_encounter_id,
+        cr.chemoradiotherapy_start_date,
+        cr.radiotherapy_outcome,
+        ROW_NUMBER() OVER (
+            PARTITION BY m3m.confirmed_mdt_encounter_id
+            ORDER BY cr.chemoradiotherapy_start_date
+        ) AS row
+    FROM more3c_post_surgery_mdt m3m
+    JOIN confirmed_mdt_first pc
+      ON pc.encounter_id = m3m.confirmed_mdt_encounter_id
+    JOIN proposed_management_plan pmp
+      ON pmp.encounter_id = m3m.more3c_post_surgery_mdt_encounter_id
+     AND pmp.reference_form_field_path = m3m.more3c_post_surgery_mdt_form_field_path
+     AND pmp.proposed_management_plan = 'Radiation therapy'
+    JOIN "31_chemoradiation" cr
+      ON cr.patient_id = pc.patient_id
+     AND cr.chemoradiotherapy_start_date > m3m.more3c_post_surgery_mdt_date
+     AND cr.radiotherapy_outcome IN (
+         'Completed without delay',
+         'Completed with delay'
+     )
+),
+more3c_post_surgery_crt AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        chemoradiotherapy_start_date,
+        radiotherapy_outcome
+    FROM more3c_post_surgery_crt_candidates
+    WHERE row = 1
 )
 SELECT
     pc.patient_id,
@@ -731,6 +927,8 @@ SELECT
     lnp.biopsy_encounter_id AS biopsy_encounter_id,
     lnp.biopsy_date AS biopsy_date,
     lnp.ln_pos AS "post_upfront_surgery_LN_post",
+    push.margins AS post_upfront_surgery_margins,
+    push.parameters AS post_upfront_surgery_parameters,
     pusm.post_upfront_surgery_mdt_date,
     pum.proposed_management_plan AS post_upfront_surgery_proposed_management,
     puscrt.chemoradiotherapy_start_date AS post_upfront_surgery_crt_start_date,
@@ -774,7 +972,27 @@ SELECT
     m3s.date_surgery_after_more_than_3_cycles AS "more3C_surgery",
     m3ln.ln_pos AS "more3C_LN_pos",
     m3h.margins AS "more3C_margins",
-    m3h.parameters AS "more3C_parameters"
+    m3h.parameters AS "more3C_parameters",
+
+    m3c.date_more_than_3_cycles AS "more3C_chemo_date",
+    m3c.max_cycle_number AS "more3C_max_cycle_number",
+    m3r.chemotherapy_response AS "more3C_chemo_response",
+
+    m3fum.more3c_follow_up_mdt_date AS "more3C_follow_up_mdt_date",
+    m3fmp.proposed_management_plan AS "more3C_follow_up_mdt_proposed_management",
+    CASE
+        WHEN LOWER(m3fmp.proposed_management_plan) LIKE '%palliative care%' THEN 'Yes'
+    END AS "more3C_follow_up_mdt_proposed_management_palliative",
+    CASE
+        WHEN LOWER(m3fmp.proposed_management_plan) LIKE '%radiation therapy%' THEN 'Yes'
+    END AS "more3C_follow_up_mdt_proposed_management_CRT_referral",
+    m3fcrt.chemoradiotherapy_start_date AS "more3C_follow_up_mdt_proposed_management_CRT_date",
+    m3fcrt.radiotherapy_outcome AS "more3C_follow_up_mdt_proposed_management_CRT_outcome",
+
+    m3m.more3c_post_surgery_mdt_date AS "more3C_after_surgery_mdt_date",
+    m3pm.proposed_management_plan AS "more3C_after_surgery_proposed_management",
+    m3pcrt.chemoradiotherapy_start_date AS "more3C_after_surgery_CRT_start_date",
+    m3pcrt.radiotherapy_outcome AS "more3C_after_surgery_CRT_outcome"
 FROM confirmed_mdt_first pc
 LEFT JOIN patient_program_data_default ppdd
   ON ppdd.patient_program_id = pc.patient_program_id
@@ -824,7 +1042,27 @@ LEFT JOIN cycle_3_follow_up_mdt_crt c3fcrt
   ON c3fcrt.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN ln_pos_first lnp
   ON lnp.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN upfront_surgery_histology push
+  ON push.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN cycle_3_ln_pos c3ln
   ON c3ln.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN cycle_3_histology c3h
-  ON c3h.confirmed_mdt_encounter_id = pc.encounter_id;
+  ON c3h.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN more_than_3_cycles m3c
+  ON m3c.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN more3c_chemo_response m3r
+  ON m3r.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN more3c_follow_up_mdt m3fum
+  ON m3fum.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN proposed_management_by_form m3fmp
+  ON m3fmp.encounter_id = m3fum.more3c_follow_up_mdt_encounter_id
+ AND m3fmp.reference_form_field_path = m3fum.more3c_follow_up_mdt_form_field_path
+LEFT JOIN more3c_follow_up_mdt_crt m3fcrt
+  ON m3fcrt.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN more3c_post_surgery_mdt m3m
+  ON m3m.confirmed_mdt_encounter_id = pc.encounter_id
+LEFT JOIN proposed_management_by_form m3pm
+  ON m3pm.encounter_id = m3m.more3c_post_surgery_mdt_encounter_id
+ AND m3pm.reference_form_field_path = m3m.more3c_post_surgery_mdt_form_field_path
+LEFT JOIN more3c_post_surgery_crt m3pcrt
+  ON m3pcrt.confirmed_mdt_encounter_id = pc.encounter_id;
