@@ -10,7 +10,11 @@ WITH pre_mdt_confirmed AS (
             PARTITION BY ptm.patient_id
             ORDER BY ptm.date_recorded
         ) AS row,
-        ptm.agreed_figo_staging_for_cancer_of_the_cervix AS cervix_figo
+        ptm.agreed_figo_staging_for_cancer_of_the_vulva AS vulva_figo,
+        ptm.agreed_figo_staging_for_cancer_of_the_vagina AS vagina_figo,
+        ptm.agreed_figo_staging_for_cancer_of_the_cervix AS cervix_figo,
+        ptm.agreed_figo_staging_for_cancer_of_the_uterus AS uterus_figo,
+        ptm.agreed_figo_staging_for_cancer_of_the_ovary AS ovary_figo
     FROM "10_pre_treatment_mdt" ptm
     WHERE EXISTS (
         SELECT 1
@@ -39,7 +43,11 @@ follow_up_mdt_confirmed_surgical AS (
             PARTITION BY fum.patient_id
             ORDER BY fum.date_recorded, fum.encounter_id
         ) AS row,
-        fum.post_operative_figo_staging_for_cancer_of_the_cervix AS cervix_figo
+        NULL AS vulva_figo,
+        NULL AS vagina_figo,
+        fum.post_operative_figo_staging_for_cancer_of_the_cervix AS cervix_figo,
+        NULL AS uterus_figo,
+        NULL AS ovary_figo
     FROM public."11_follow_up_mdt" fum
     WHERE EXISTS (
         SELECT 1
@@ -71,6 +79,31 @@ confirmed_mdt_first AS (
           FROM pre_mdt_confirmed ptm
           WHERE ptm.patient_id = fum.patient_id
       )
+),
+topography_dedup AS (
+    SELECT DISTINCT
+        encounter_id,
+        topography_of_the_tumour
+    FROM topography_of_the_tumour
+    WHERE topography_of_the_tumour IN (
+        'Cervix Uteri',
+        'Corpus Uteri',
+        'Ovary',
+        'Vulva',
+        'Vagina',
+        'Other female genital organs'
+    )
+),
+topography_list AS (
+    SELECT
+        encounter_id,
+        STRING_AGG(
+            topography_of_the_tumour,
+            ', '
+            ORDER BY topography_of_the_tumour
+        ) AS topography_of_the_tumour_list
+    FROM topography_dedup
+    GROUP BY encounter_id
 ),
 proposed_management_by_form AS (
     SELECT
@@ -216,6 +249,7 @@ more_than_3_cycles_candidates AS (
     SELECT
        pc.encounter_id AS confirmed_mdt_encounter_id,
        chemo.date_recorded AS date_more_than_3_cycles,
+       chemo.type_of_chemotherapy AS more_than_3_cycles_chemotherapy_type,
        MAX(chemo.cycle_number) OVER (
            PARTITION BY pc.encounter_id
        ) AS max_cycle_number,
@@ -233,6 +267,7 @@ more_than_3_cycles AS (
     SELECT
        confirmed_mdt_encounter_id,
        date_more_than_3_cycles,
+       more_than_3_cycles_chemotherapy_type,
        max_cycle_number
     FROM more_than_3_cycles_candidates
     WHERE row = 1
@@ -772,9 +807,19 @@ more3c_follow_up_mdt_candidates AS (
     FROM more_than_3_cycles m3c
     JOIN confirmed_mdt_first pc
       ON pc.encounter_id = m3c.confirmed_mdt_encounter_id
+    LEFT JOIN cycle_3_follow_up_mdt c3fum
+      ON c3fum.confirmed_mdt_encounter_id = m3c.confirmed_mdt_encounter_id
     JOIN public."11_follow_up_mdt" fum
       ON fum.patient_id = pc.patient_id
      AND fum.date_recorded > m3c.date_more_than_3_cycles
+     AND (
+         c3fum.cycle_3_follow_up_mdt_date IS NULL
+         OR fum.date_recorded > c3fum.cycle_3_follow_up_mdt_date
+     )
+     AND (
+         c3fum.cycle_3_follow_up_mdt_encounter_id IS NULL
+         OR fum.encounter_id <> c3fum.cycle_3_follow_up_mdt_encounter_id
+     )
      AND fum.treatment_type = 'Chemotherapy follow up'
 ),
 more3c_follow_up_mdt AS (
@@ -915,12 +960,19 @@ more3c_post_surgery_crt AS (
 )
 SELECT
     pc.patient_id,
-    pc.encounter_id,
+    pc.encounter_id AS confirmed_mdt_first_encounter_id,
     pc.patient_program_id AS confirmed_mdt_first_patient_program_id,
     ppdd.program_outcome AS confirmed_mdt_first_program_outcome,
+
     pc.confirmed_mdt_date AS confirmed_mdt_first_date,
     pc.confirmed_malignancy_source AS confirmed_mdt_first_type,
-    pc.cervix_figo AS figo_stage,
+    cfmp.proposed_management_plan AS confirmed_mdt_first_proposed_management,
+    tl.topography_of_the_tumour_list AS topography,
+    pc.vulva_figo AS vulva_figo,
+    pc.vagina_figo AS vagina_figo,
+    pc.cervix_figo AS cervical_figo_stage,
+    pc.uterus_figo AS uterus_figo,
+    pc.ovary_figo AS ovary_figo,
 
     us.date_upfront_surgery AS upfront_surgery,
 
@@ -937,6 +989,7 @@ SELECT
     c3c.cycle_3_chemotherapy_date AS "3C_chemo_date",
     c3c.cycle_3_chemotherapy_type AS "3C_chemo_type",
     c3r.chemotherapy_response AS "3C_chemo_response",
+    c3fum.cycle_3_follow_up_mdt_encounter_id AS "3C_follow_up_mdt_encounter_id",
     c3fum.cycle_3_follow_up_mdt_date AS "3C_follow_up_mdt_date",
     c3fmp.proposed_management_plan AS "3C_follow_up_mdt_proposed_management",
     CASE
@@ -976,8 +1029,10 @@ SELECT
 
     m3c.date_more_than_3_cycles AS "more3C_chemo_date",
     m3c.max_cycle_number AS "more3C_max_cycle_number",
+    m3c.more_than_3_cycles_chemotherapy_type AS "more3C_chemo_type",
     m3r.chemotherapy_response AS "more3C_chemo_response",
 
+    m3fum.more3c_follow_up_mdt_encounter_id AS "more3C_follow_up_mdt_encounter_id",
     m3fum.more3c_follow_up_mdt_date AS "more3C_follow_up_mdt_date",
     m3fmp.proposed_management_plan AS "more3C_follow_up_mdt_proposed_management",
     CASE
@@ -996,6 +1051,11 @@ SELECT
 FROM confirmed_mdt_first pc
 LEFT JOIN patient_program_data_default ppdd
   ON ppdd.patient_program_id = pc.patient_program_id
+LEFT JOIN proposed_management_by_form cfmp
+  ON cfmp.encounter_id = pc.encounter_id
+ AND cfmp.reference_form_field_path = pc.form_field_path
+LEFT JOIN topography_list tl
+  ON tl.encounter_id = pc.encounter_id
 LEFT JOIN upfront_surgery us
   ON us.confirmed_mdt_encounter_id = pc.encounter_id
 LEFT JOIN post_upfront_surgery_mdt pusm
