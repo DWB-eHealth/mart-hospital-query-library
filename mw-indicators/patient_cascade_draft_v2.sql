@@ -43,18 +43,18 @@ follow_up_mdt_confirmed_surgical AS (
             PARTITION BY fum.patient_id
             ORDER BY fum.date_recorded, fum.encounter_id
         ) AS row,
-        NULL AS vulva_figo,
-        NULL AS vagina_figo,
+        fum.post_operative_figo_staging_for_cancer_of_the_vulva AS vulva_figo,
+        fum.post_operative_figo_staging_for_cancer_of_the_vagina AS vagina_figo,
         fum.post_operative_figo_staging_for_cancer_of_the_cervix AS cervix_figo,
-        NULL AS uterus_figo,
-        NULL AS ovary_figo
+        fum.post_operative_figo_staging_for_cancer_of_the_uterus AS uterus_figo,
+        fum.post_operative_figo_staging_for_cancer_of_the_ovary AS ovary_figo
     FROM public."11_follow_up_mdt" fum
     WHERE EXISTS (
         SELECT 1
         FROM public.post_operative_diagnosis pod
         WHERE pod.encounter_id = fum.encounter_id
           AND pod.reference_form_field_path = fum.form_field_path
-          AND NULLIF(BTRIM(pod.post_operative_diagnosis), '') IS NOT NULL
+          AND BTRIM(pod.post_operative_diagnosis) = 'Confirmed malignancy'
     )
     AND EXISTS (
         SELECT 1
@@ -86,6 +86,25 @@ topography_dedup AS (
         topography_of_the_tumour
     FROM topography_of_the_tumour
     WHERE topography_of_the_tumour IN (
+        'Cervix Uteri',
+        'Corpus Uteri',
+        'Ovary',
+        'Vulva',
+        'Vagina',
+        'Other female genital organs'
+    )
+
+    UNION
+
+    SELECT DISTINCT
+        pot.encounter_id,
+        pot.post_operative_topography_of_the_tumour AS topography_of_the_tumour
+    FROM public.post_operative_topography_of_the_tumour pot
+    WHERE NULLIF(
+        BTRIM(pot.post_operative_topography_of_the_tumour),
+        ''
+    ) IS NOT NULL
+      AND pot.post_operative_topography_of_the_tumour IN (
         'Cervix Uteri',
         'Corpus Uteri',
         'Ovary',
