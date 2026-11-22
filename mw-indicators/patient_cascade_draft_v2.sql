@@ -73,6 +73,14 @@ confirmed_mdt_first AS (
           WHERE ptm.patient_id = fum.patient_id
       )
 ),
+initial_consultation AS (
+    SELECT
+        patient_id,
+        patient_program_id,
+        MIN(date_recorded) AS initial_consultation_date
+    FROM "05_initial_consultation"
+    GROUP BY patient_id, patient_program_id
+),
 topography_dedup AS (
     SELECT DISTINCT
         encounter_id,
@@ -913,6 +921,10 @@ SELECT
     cmf.encounter_id AS confirmed_mdt_first_encounter_id,
     cmf.patient_program_id AS confirmed_mdt_first_patient_program_id,
     ppdd.program_outcome AS confirmed_mdt_first_program_outcome,
+    ic.initial_consultation_date AS "Date of Initial Consultation",
+    (
+        cmf.confirmed_mdt_date::date - ic.initial_consultation_date::date
+    ) AS "Days between Initial Consultation and Confirmed First MDT",
 
     cmf.confirmed_mdt_date AS confirmed_mdt_first_date,
     cmf.confirmed_malignancy_source AS confirmed_mdt_first_type,
@@ -1021,6 +1033,9 @@ SELECT
 FROM confirmed_mdt_first cmf
 LEFT JOIN patient_program_data_default ppdd
   ON ppdd.patient_program_id = cmf.patient_program_id
+LEFT JOIN initial_consultation ic
+  ON ic.patient_id = cmf.patient_id
+ AND ic.patient_program_id = cmf.patient_program_id
 LEFT JOIN proposed_management_by_form cfmp
   ON cfmp.encounter_id = cmf.encounter_id
  AND cfmp.reference_form_field_path = cmf.form_field_path
