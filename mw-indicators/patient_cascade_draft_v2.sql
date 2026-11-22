@@ -940,7 +940,7 @@ SELECT
 
     lnp.biopsy_encounter_id AS biopsy_encounter_id,
     lnp.biopsy_date AS biopsy_date,
-    lnp.ln_pos AS "post_upfront_surgery_LN_post",
+    lnp.ln_pos AS "post_upfront_surgery_LN_pos",
     push.margins AS post_upfront_surgery_margins,
     push.parameters AS post_upfront_surgery_parameters,
     nfm.date_next_follow_up_mdt AS post_upfront_surgery_mdt_date,
