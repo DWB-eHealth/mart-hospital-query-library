@@ -315,6 +315,63 @@ post_gt3_cycle_chemo AS (
     FROM cycle_3_post_surgery_chemo_cycles
     WHERE chemo_cycles_after_cycle_3_surgery > 3
 ),
+subsequent_consultation_response_thresholds AS (
+    SELECT
+        cmf.encounter_id AS confirmed_mdt_encounter_id,
+        cmf.patient_id,
+        'cycle_3' AS response_source,
+        c3c.cycle_3_chemotherapy_date AS response_after_date
+    FROM cycle_3_chemotherapy c3c
+    JOIN confirmed_mdt_first cmf
+      ON cmf.encounter_id = c3c.confirmed_mdt_encounter_id
+
+    UNION ALL
+
+    SELECT
+        cmf.encounter_id AS confirmed_mdt_encounter_id,
+        cmf.patient_id,
+        'more_than_3_cycles' AS response_source,
+        m3c.date_more_than_3_cycles AS response_after_date
+    FROM more_than_3_cycles m3c
+    JOIN confirmed_mdt_first cmf
+      ON cmf.encounter_id = m3c.confirmed_mdt_encounter_id
+
+    UNION ALL
+
+    SELECT
+        cmf.encounter_id AS confirmed_mdt_encounter_id,
+        cmf.patient_id,
+        'post_gt3_cycle' AS response_source,
+        c3pc.last_post_surgery_chemo_date AS response_after_date
+    FROM post_gt3_cycle_chemo c3pc
+    JOIN confirmed_mdt_first cmf
+      ON cmf.encounter_id = c3pc.confirmed_mdt_encounter_id
+),
+subsequent_consultation_response_candidates AS (
+    SELECT
+        thresholds.confirmed_mdt_encounter_id,
+        thresholds.response_source,
+        sc.chemotherapy_response,
+        ROW_NUMBER() OVER (
+            PARTITION BY
+                thresholds.confirmed_mdt_encounter_id,
+                thresholds.response_source
+            ORDER BY sc.date_recorded, sc.encounter_id
+        ) AS row
+    FROM subsequent_consultation_response_thresholds thresholds
+    JOIN "07_subsequent_consultation" sc
+      ON sc.patient_id = thresholds.patient_id
+     AND sc.date_recorded > thresholds.response_after_date
+     AND NULLIF(sc.chemotherapy_response, '') IS NOT NULL
+),
+subsequent_consultation_response AS (
+    SELECT
+        confirmed_mdt_encounter_id,
+        response_source,
+        chemotherapy_response
+    FROM subsequent_consultation_response_candidates
+    WHERE row = 1
+),
 post_gt3_cycle_chemo_response AS (
     SELECT
         c3pc.confirmed_mdt_encounter_id,
@@ -350,15 +407,9 @@ post_gt3_cycle_chemo_response AS (
         ORDER BY fum.date_recorded, fum.encounter_id
         LIMIT 1
     ) mdt ON TRUE
-    LEFT JOIN LATERAL (
-        SELECT sc.chemotherapy_response
-        FROM "07_subsequent_consultation" sc
-        WHERE sc.patient_id = cmf.patient_id
-          AND sc.date_recorded > c3pc.last_post_surgery_chemo_date
-          AND NULLIF(sc.chemotherapy_response, '') IS NOT NULL
-        ORDER BY sc.date_recorded, sc.encounter_id
-        LIMIT 1
-    ) sc ON TRUE
+    LEFT JOIN subsequent_consultation_response sc
+      ON sc.confirmed_mdt_encounter_id = c3pc.confirmed_mdt_encounter_id
+     AND sc.response_source = 'post_gt3_cycle'
 ),
 post_gt3_cycle_response_mdt_crt_candidates AS (
     SELECT
@@ -543,15 +594,9 @@ cycle_3_chemo_response AS (
       ON cmf.encounter_id = c3c.confirmed_mdt_encounter_id
     LEFT JOIN cycle_3_follow_up_mdt mdt
       ON mdt.confirmed_mdt_encounter_id = c3c.confirmed_mdt_encounter_id
-    LEFT JOIN LATERAL (
-        SELECT sc.chemotherapy_response
-        FROM "07_subsequent_consultation" sc
-        WHERE sc.patient_id = cmf.patient_id
-          AND sc.date_recorded > c3c.cycle_3_chemotherapy_date
-          AND NULLIF(sc.chemotherapy_response, '') IS NOT NULL
-        ORDER BY sc.date_recorded, sc.encounter_id
-        LIMIT 1
-    ) sc ON TRUE
+    LEFT JOIN subsequent_consultation_response sc
+      ON sc.confirmed_mdt_encounter_id = c3c.confirmed_mdt_encounter_id
+     AND sc.response_source = 'cycle_3'
 ),
 lymph_node_results AS (
     SELECT
@@ -848,15 +893,9 @@ more3c_chemo_response AS (
       ON cmf.encounter_id = m3c.confirmed_mdt_encounter_id
     LEFT JOIN more3c_follow_up_mdt mdt
       ON mdt.confirmed_mdt_encounter_id = m3c.confirmed_mdt_encounter_id
-    LEFT JOIN LATERAL (
-        SELECT sc.chemotherapy_response
-        FROM "07_subsequent_consultation" sc
-        WHERE sc.patient_id = cmf.patient_id
-          AND sc.date_recorded > m3c.date_more_than_3_cycles
-          AND NULLIF(sc.chemotherapy_response, '') IS NOT NULL
-        ORDER BY sc.date_recorded, sc.encounter_id
-        LIMIT 1
-    ) sc ON TRUE
+    LEFT JOIN subsequent_consultation_response sc
+      ON sc.confirmed_mdt_encounter_id = m3c.confirmed_mdt_encounter_id
+     AND sc.response_source = 'more_than_3_cycles'
 ),
 more3c_post_surgery_mdt_candidates AS (
     SELECT
